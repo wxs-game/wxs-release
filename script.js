@@ -84,46 +84,6 @@ document.documentElement.classList.add('tg-ok');
 tg.ready();
 tg.expand();
 
-// Шапка: режим fullscreen (кнопки Telegram сверху) и автоподгон размера цифр баланса
-(function setupTopBar() {
-    const root = document.documentElement;
-    let raf = 0, lastKey = '';
-    function applyInsets() {
-        const v = parseFloat(getComputedStyle(root).getPropertyValue('--tg-content-safe-area-inset-top')) || 0;
-        root.classList.toggle('tg-fs', v > 0 || tg.isFullscreen === true);
-    }
-    function fit() {
-        cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(() => {
-            const el = document.getElementById('topBalance');
-            if (!el) return;
-            const hdr = el.closest('header.top');
-            const key = el.textContent + '|' + (hdr ? hdr.clientWidth : 0) + '|' + root.className;
-            if (key === lastKey) return;
-            lastKey = key;
-            el.style.fontSize = '';
-            let size = parseFloat(getComputedStyle(el).fontSize) || 17;
-            while (el.scrollWidth > el.clientWidth + 0.5 && size > 10) {
-                size -= 0.5;
-                el.style.fontSize = size + 'px';
-            }
-        });
-    }
-    ['fullscreenChanged', 'contentSafeAreaChanged', 'safeAreaChanged', 'viewportChanged'].forEach(ev => {
-        try { tg.onEvent(ev, () => { applyInsets(); lastKey = ''; fit(); }); } catch (e) {}
-    });
-    window.addEventListener('resize', () => { lastKey = ''; fit(); });
-    applyInsets();
-    const start = () => {
-        const el = document.getElementById('topBalance');
-        if (!el) return;
-        new MutationObserver(fit).observe(el, { childList: true, characterData: true, subtree: true });
-        fit();
-    };
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-    else start();
-})();
-
 function showBlockScreen(title, text) {
     const b = document.getElementById('tgBlockScreen');
     if (!b) return;
@@ -528,7 +488,7 @@ async function loadUserData() {
         console.error('ensure_player:', error);
         // Сервер отверг подпись initData — запуск не из разрешённого бота
         if (typeof error === 'string' && /INIT|SIGN|HASH|BOT|FORBID|AUTH/i.test(error)) {
-            showBlockScreen('Доступ запрещён', 'Не удалось подтвердить запуск из Telegram. Код ошибки: ' + error + '. Откройте приложение через бота ' + (window.WXS_BOT || '@wxscrash_bot') + '.');
+            showBlockScreen('Доступ запрещён', 'Откройте приложение через бота ' + (window.WXS_BOT || '@wxscrash_bot') + '.');
             return false;
         }
         showMessage('Не удалось загрузить профиль. Проверьте соединение и перезапустите приложение. (код: ' + (typeof error === 'string' ? error : 'ERR') + ')');
