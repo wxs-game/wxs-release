@@ -3038,6 +3038,7 @@ function hideAppLoader(assetsReady) {
 window.adjustCrashBet = adjustCrashBet;
 window.setCrashMaxBet = setCrashMaxBet;
 window.handleCrashAction = handleCrashAction;
+window.toggleCrashFreebet = toggleCrashFreebet;
 window.clampBetInputOnBlur = clampBetInputOnBlur;
 window.blockInvalidBetKeys = blockInvalidBetKeys;
 window.showMessage = showMessage;
