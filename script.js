@@ -124,6 +124,11 @@ function showBlockScreen(title, text) {
         if (!isEditable(e.target)) e.preventDefault();
     }, true);
     document.addEventListener('dragstart', (e) => e.preventDefault());
+    // Долгое нажатие по картинке (аватар и пр.) не открывает системное меню/ссылку
+    document.addEventListener('contextmenu', (e) => {
+        const el = (e.target && e.target.nodeType === 1) ? e.target : (e.target && e.target.parentElement);
+        if (el && el.closest && el.closest('img, .top, .avatar, .avatar-frame')) e.preventDefault();
+    }, true);
     document.addEventListener('selectionchange', () => {
         const a = document.activeElement;
         if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return;
@@ -473,7 +478,9 @@ function updateProfileUI(data) {
     // Аватар строим через DOM (а не innerHTML) и только из https-ссылки
     if (avatarElem && typeof data.photo_url === 'string' && /^https:\/\//i.test(data.photo_url)) {
         const img = document.createElement('img');
-        img.alt = 'avatar';
+        img.alt = '';
+        img.draggable = false;
+        img.referrerPolicy = 'no-referrer';
         img.src = data.photo_url;
         img.style.cssText = 'width:100%; height:100%; object-fit:cover; border-radius:50%;';
         avatarElem.textContent = '';
