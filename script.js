@@ -2297,7 +2297,7 @@ function crashFbNew() {
 
 async function loadCrashFreebets() {
     const myId = myCrashTelegramId();
-    if (myId == null) return;
+    if (myId == null) { showMessage('FB: нет telegram id'); return; }
     try {
         const { data, error } = await supabase
             .from('crash_freebets')
@@ -2305,9 +2305,10 @@ async function loadCrashFreebets() {
             .eq('telegram_id', Number(myId))
             .in('status', ['new', 'active'])
             .order('created_at', { ascending: true });
-        if (error || !Array.isArray(data)) return;
+        if (error || !Array.isArray(data)) { showMessage('FB ошибка: ' + (error?.message || 'нет данных')); return; }
+        showMessage('FB найдено: ' + data.length);
         crashFreebets = data.map(f => ({ id: f.id, amount: roundMoney(f.amount), status: f.status, bet_id: f.bet_id }));
-    } catch (e) { return; }
+    } catch (e) { showMessage('FB catch: ' + e.message); return; }
 
     // перезашли в приложение с уже поставленным фрибетом — находим его, чтобы кэшаут шёл как фрибет
     if (!crashFbBetId && crashGame.betPlaced && crashGame.myBetRowId != null) {
