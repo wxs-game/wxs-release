@@ -1292,14 +1292,19 @@ main {
     border-radius: 28px 28px 0 0;
     padding: 12px 20px 28px 20px;
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
-    animation: slideUpModal 0.25s cubic-bezier(0.1, 0.9, 0.2, 1);
     transition: transform 0.25s cubic-bezier(0.1, 0.9, 0.2, 1);
     will-change: transform;
 }
 
+/* Выезд при открытии — одноразовый класс (вешается из JS). Раньше анимация была
+   на самом блоке и перезапускалась при каждом снятии .dragging — отсюда «шторка
+   открывается заново» после любого жеста за язычок. */
+.crash-fairness-content.opening {
+    animation: slideUpModal 0.25s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
 .crash-fairness-content.dragging {
     transition: none;
-    animation: none;
 }
 
 @keyframes slideUpModal {

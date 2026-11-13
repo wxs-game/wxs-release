@@ -276,8 +276,21 @@ function hideCrashRoundKey() {
 // ОБРАБОТЧИКИ СОБЫТИЙ ОКНА И КОПИРОВАНИЯ
 // ==========================================
 function openCrashFairnessModal() {
+    const content = document.getElementById('crashFairnessContent');
+    if (content) {                       // чистое состояние: никаких «застрявших» сдвигов от прошлого жеста
+        content.classList.remove('dragging');
+        content.style.transform = '';
+    }
     document.getElementById('crashFairnessModal')?.classList.remove('hidden');
     document.body.classList.add('fairness-modal-open');
+    if (content) {                       // выезд — один раз, на открытии
+        content.classList.remove('opening');
+        void content.offsetWidth;
+        content.classList.add('opening');
+        const done = () => content.classList.remove('opening');
+        content.addEventListener('animationend', done, { once: true });
+        content.addEventListener('animationcancel', done, { once: true });
+    }
 }
 
 function closeCrashFairnessModal() {
@@ -299,60 +312,105 @@ function closeCrashFairnessModal() {
     const content = document.getElementById('crashFairnessContent');
     if (!handle || !content) return;
 
-    const CLOSE_THRESHOLD = 80; // px, после которых плашка закрывается при отпускании
-    let startY = 0;
-    let currentY = 0;
-    let dragging = false;
-    let moved = false;
+    const CLOSE_DISTANCE = 90;     // px вниз — закрываем при отпускании
+    const FLICK_SPEED = 0.55;      // px/мс — быстрый «щелчок» вниз закрывает и при малой дистанции
+    const FLICK_MIN = 24;          // ...но не меньше этой дистанции
+    const TAP_SLOP = 8;            // сдвиг меньше этого — это тап, а не перетягивание
+    const CLICK_BLOCK_MS = 450;    // после жеста гасим «фантомный» клик по тому, что под пальцем
 
-    function onPointerDown(e) {
-        dragging = true;
-        moved = false;
-        content.classList.add('dragging');
-        startY = (e.touches ? e.touches[0].clientY : e.clientY);
-        currentY = 0;
-        document.addEventListener('touchmove', onPointerMove, { passive: false });
-        document.addEventListener('touchend', onPointerUp);
-        document.addEventListener('mousemove', onPointerMove);
-        document.addEventListener('mouseup', onPointerUp);
+    let activeId = null;
+    let startY = 0, lastY = 0, lastT = 0, speed = 0, dy = 0;
+    let dragged = false;           // был ли реальный жест (в любую сторону)
+    let closing = false;
+    let blockClicksUntil = 0;
+
+    // Любой жест (вверх, вниз, отменённый) не должен «просочиться» кликом в то, что под пальцем
+    // или под шторкой (кнопка ставки, шестерёнка честности, ссылка проверки и т.п.).
+    document.addEventListener('click', (e) => {
+        if (performance.now() < blockClicksUntil) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+        }
+    }, true);
+
+    function setY(y) {
+        content.style.transform = y > 0 ? `translate3d(0, ${y}px, 0)` : '';
     }
 
-    function onPointerMove(e) {
-        if (!dragging) return;
-        const y = (e.touches ? e.touches[0].clientY : e.clientY);
-        const delta = y - startY;
-        currentY = Math.max(0, delta); // тянуть можно только вниз
-        if (currentY > 4) moved = true;
-        content.style.transform = `translateY(${currentY}px)`;
-        if (e.cancelable) e.preventDefault();
-    }
-
-    function onPointerUp() {
-        if (!dragging) return;
-        dragging = false;
+    function finish(e) {
+        if (activeId === null || (e && e.pointerId !== activeId)) return;
+        try { handle.releasePointerCapture(activeId); } catch (err) {}
+        activeId = null;
         content.classList.remove('dragging');
-        document.removeEventListener('touchmove', onPointerMove);
-        document.removeEventListener('touchend', onPointerUp);
-        document.removeEventListener('mousemove', onPointerMove);
-        document.removeEventListener('mouseup', onPointerUp);
 
-        if (currentY > CLOSE_THRESHOLD) {
-            closeCrashFairnessModal();
+        if (dragged) blockClicksUntil = performance.now() + CLICK_BLOCK_MS;
+
+        const cancelled = !!(e && e.type === 'pointercancel');
+        const shouldClose = !cancelled && dy > 0 &&
+            (dy > CLOSE_DISTANCE || (speed > FLICK_SPEED && dy > FLICK_MIN));
+
+        if (shouldClose) {
+            closeAnimated();
         } else {
-            content.style.transform = '';
+            setY(0);                // плавно возвращается на место (transition в CSS)
         }
-        currentY = 0;
+        dy = 0; speed = 0;
     }
 
-    handle.addEventListener('touchstart', onPointerDown, { passive: true });
-    handle.addEventListener('mousedown', onPointerDown);
-
-    // Просто тап по полоске-хэндлу без перетягивания — закрывает меню
-    handle.addEventListener('click', () => {
-        if (!moved) {
+    function closeAnimated() {
+        if (closing) return;
+        closing = true;
+        content.style.transform = 'translate3d(0, 100%, 0)';
+        setTimeout(() => {
+            closing = false;
             closeCrashFairnessModal();
-        }
+        }, 180);
+    }
+
+    handle.addEventListener('pointerdown', (e) => {
+        if (activeId !== null || closing) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        activeId = e.pointerId;
+        content.classList.remove('opening');   // палец на язычке — выезд больше не нужен
+        startY = lastY = e.clientY;
+        lastT = performance.now();
+        dy = 0; speed = 0; dragged = false;
+        content.classList.add('dragging');
+        try { handle.setPointerCapture(activeId); } catch (err) {}
     });
+
+    handle.addEventListener('pointermove', (e) => {
+        if (e.pointerId !== activeId) return;
+        const raw = e.clientY - startY;
+
+        if (Math.abs(raw) > TAP_SLOP) dragged = true;
+
+        // Вверх тянуть некуда: шторка стоит на месте (без «пружины» и пустой щели снизу)
+        dy = Math.max(0, raw);
+
+        const now = performance.now();
+        const dt = now - lastT;
+        if (dt > 0) speed = 0.8 * speed + 0.2 * ((e.clientY - lastY) / dt);
+        lastY = e.clientY; lastT = now;
+
+        if (dragged) setY(dy);
+        if (e.cancelable) e.preventDefault();
+    });
+
+    handle.addEventListener('pointerup', finish);
+    handle.addEventListener('pointercancel', finish);
+    handle.addEventListener('lostpointercapture', finish);
+
+    // Тап по полоске без перетягивания закрывает меню. Закрываем по click (а не по pointerup),
+    // чтобы фантомный клик после закрытия не попал в кнопки под шторкой.
+    handle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (dragged) { dragged = false; return; }
+        closeAnimated();
+    });
+
+    // Подстраховка: если окно закрыли/скрыли посреди жеста — состояние не «залипает»
+    window.addEventListener('blur', () => finish({ pointerId: activeId, type: 'pointercancel' }));
 })();
 
 function copyCrashHash() {
