@@ -2326,6 +2326,7 @@ async function loadCrashFreebets() {
 }
 
 function toggleCrashFreebet() {
+    showMessage('FB tap: фаза=' + crashGame.phase + ', новых=' + crashFbNew().length);
     if (!crashFbNew().length) return;
     if (crashGame.phase !== 'waiting' || crashGame.betPlaced || crashGame.queued || crashGame.isProcessing) {
         showMessage('Фрибет можно поставить только в фазе ожидания раунда.');
@@ -2360,11 +2361,11 @@ function renderCrashFreebet() {
 
 async function placeCrashFreebet() {
     const round = crashLobby.round;
-    if (!round || round.id !== crashGame.roundId || crashGame.phase !== 'waiting' || crashGame.betPlaced || crashGame.queued) return;
-    if (crashGame.isProcessing) return;
+    if (!round || round.id !== crashGame.roundId || crashGame.phase !== 'waiting' || crashGame.betPlaced || crashGame.queued) { showMessage('FB стоп: раунд=' + (round ? round.id : 'нет') + ' / ' + crashGame.roundId + ', фаза=' + crashGame.phase + ', ставка=' + crashGame.betPlaced + ', очередь=' + crashGame.queued); return; }
+    if (crashGame.isProcessing) { showMessage('FB стоп: идёт обработка'); return; }
     const fb = crashFbNew()[0];
-    if (!fb) { crashFreebetOn = false; renderCrashFreebet(); return; }
-    if (!lockEconomy()) return;
+    if (!fb) { showMessage('FB стоп: нет фрибета'); crashFreebetOn = false; renderCrashFreebet(); return; }
+    if (!lockEconomy()) { showMessage('FB стоп: экономика заблокирована'); return; }
 
     crashGame.isProcessing = true;
     const myName = document.getElementById('username')?.textContent?.trim() || 'Игрок';
