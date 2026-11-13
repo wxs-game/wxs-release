@@ -12,6 +12,7 @@
     <script>
     (function () {
         var KNOWN = { crash: true };   // сюда добавлять новые режимы: mines, upgrader ...
+        var BOTS = { crash: '@wxscrash_bot' };   // бот каждого режима (для текста «откройте через бота»)
         var route = location.pathname.replace(/^\/wxs-release/i, '').replace(/^\/+|\/+$/g, '').toLowerCase();
         if (!route) { try { route = (new URLSearchParams(location.search).get('app') || '').toLowerCase(); } catch (e) {} }
         window.WXS_ROUTE = KNOWN[route] ? route : '';
@@ -20,6 +21,7 @@
             document.documentElement.innerHTML = '<head><meta charset="UTF-8"><meta name="robots" content="noindex"><title></title></head><body style="margin:0;background:#090909"></body>';
             return;
         }
+        window.WXS_BOT = BOTS[window.WXS_ROUTE] || '';
         document.documentElement.setAttribute('data-route', window.WXS_ROUTE);
     })();
     </script>
@@ -153,11 +155,13 @@
     <div class="tg-block-inner">
         <div class="tg-block-icon">✈️</div>
         <div class="tg-block-title">Доступ только через Telegram</div>
-        <p class="tg-block-text">Это приложение работает только внутри Telegram. Откройте его через бота @wxsgame.</p>
+        <p class="tg-block-text">Это приложение работает только внутри Telegram. Откройте его через бота <span id="tgBlockBot">@wxscrash_bot</span>.</p>
     </div>
 </div>
 <script>
 (function () {
+    var botEl = document.getElementById('tgBlockBot');
+    if (botEl && window.WXS_BOT) botEl.textContent = window.WXS_BOT;
     var tg = window.Telegram && window.Telegram.WebApp;
     if (tg && typeof tg.initData === 'string' && tg.initData.length > 0 && tg.platform && tg.platform !== 'unknown') {
         document.documentElement.classList.add('tg-ok');

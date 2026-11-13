@@ -488,7 +488,7 @@ async function loadUserData() {
         console.error('ensure_player:', error);
         // Сервер отверг подпись initData — запуск не из разрешённого бота
         if (typeof error === 'string' && /INIT|SIGN|HASH|BOT|FORBID|AUTH/i.test(error)) {
-            showBlockScreen('Доступ запрещён', 'Откройте приложение через бота @wxsgame.');
+            showBlockScreen('Доступ запрещён', 'Откройте приложение через бота ' + (window.WXS_BOT || '@wxscrash_bot') + '.');
             return false;
         }
         showMessage('Не удалось загрузить профиль. Проверьте соединение и перезапустите приложение. (код: ' + (typeof error === 'string' ? error : 'ERR') + ')');
