@@ -744,7 +744,7 @@ const CRASH_ADVANCE_RETRY_MS = 500;     // не чаще — повтор зап
 // было 1 с, и КАЖДЫЙ открытый мини-апп бил в базу раз в секунду (см. лог:
 // "canceling statement due to statement timeout", "cron job startup timeout").
 const CRASH_TICK_CALL_MS = 2000;
-const CRASH_FLIGHT_POKE_MS = 400;     // в полёте: сервер сам знает момент краша, клиент лишь торопит его
+const CRASH_FLIGHT_POKE_MS = 250;     // в полёте: сервер сам знает момент краша, клиент лишь торопит его
 // При ошибке тик не повторяем вплотную: пауза удваивается до этого потолка.
 const CRASH_TICK_BACKOFF_MAX_MS = 30000;
 const CRASH_CLOCK_RESYNC_MS = 90000;
@@ -754,9 +754,9 @@ let crashClockOffset = 0;   // serverMs - localMs
 
 function crashNow() { return Date.now() + crashClockOffset; }
 
-async function syncCrashClockViaRpc() {
+async function syncCrashClockViaRpc(samples = 4) {
     let best = null;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < samples; i++) {
         const t0 = Date.now();
         const { data, error } = await supabase.rpc('server_now');
         const t1 = Date.now();
@@ -790,9 +790,9 @@ async function syncCrashClockViaHttpDate() {
     }
 }
 
-async function syncCrashClock() {
+async function syncCrashClock(samples = 4) {
     let best = null;
-    try { best = await syncCrashClockViaRpc(); } catch (e) { best = null; }
+    try { best = await syncCrashClockViaRpc(samples); } catch (e) { best = null; }
     if (!best) best = await syncCrashClockViaHttpDate();
     if (best) crashClockOffset = best.off;
 }
@@ -813,6 +813,11 @@ function computeCrashDurationMs(crashPoint) {
     const s = (-k + Math.sqrt(k * k + 2 * a * L)) / a;
     return CRASH_SLOW_START_MS + s;
 }
+
+// Сервер ограничивает точку краша 1000x, значит полёт физически не может длиться
+// дольше этого. Если «летим» дольше — раунд уже взорвался на сервере, а мы просто
+// ещё не получили новость (именно отсюда брались Infinity× и 1029838...× при перезаходе).
+const CRASH_MAX_FLIGHT_MS = computeCrashDurationMs(1000);
 
 function crashParseTime(iso) {
     const t = iso ? new Date(iso).getTime() : NaN;
@@ -1117,6 +1122,7 @@ function computeCrashMultAt(elapsedMs, crashPointCap) {
         rawMult = CRASH_SLOW_START_TARGET *
             Math.exp(CRASH_GROWTH_PER_MS * s + 0.5 * CRASH_GROWTH_ACCEL * s * s);
     }
+    if (!isFinite(rawMult) || rawMult > 1000) rawMult = 1000;
     const floored = Math.floor(rawMult * 100) / 100;
     return crashPointCap != null ? Math.min(crashPointCap, floored) : floored;
 }
@@ -1147,18 +1153,19 @@ async function startCrashEngine() {
     crashLoopStarted = true;
 
     // Часы — ПЕРВЫМ делом (но не дольше 2.5 сек, чтобы не тормозить запуск)
-    await Promise.race([syncCrashClock(), new Promise(r => setTimeout(r, 2500))]);
-    setInterval(syncCrashClock, CRASH_CLOCK_RESYNC_MS);
+    // Один быстрый замер — и сразу в бой; точные замеры (4 шт.) добиваем в фоне.
+    await Promise.race([syncCrashClock(1), new Promise(r => setTimeout(r, 1200))]);
+    syncCrashClock().catch(() => {});
+    setInterval(() => syncCrashClock(), CRASH_CLOCK_RESYNC_MS);
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) return;
         // вернулись из фона — таймеры могли «проспать», сверяем всё заново
         syncCrashClock().finally(() => { advanceLocalPhase(); });
+        crashColdChecked = false;   // из фона вернулись — раунд мог уйти вперёд, сверяем с сервером
         refreshCrashState();
     });
 
-    await loadCrashHistoryFromServer();
-    renderCrashHistory();
-
+    loadCrashHistoryFromServer().then(renderCrashHistory).catch(() => {});
     await refreshCrashState();
     startCrashClock();
 
@@ -1174,7 +1181,14 @@ async function startCrashEngine() {
             // это событие делал ещё 2-3 запроса. Список игроков и так
             // обновляется опросом раз в 1.5 с — разница незаметна, а нагрузка
             // падает в разы.
-            .on('postgres_changes', { event: '*', schema: 'public', table: CRASH_ROUNDS_TABLE }, () => scheduleCrashReload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: CRASH_ROUNDS_TABLE }, (payload) => {
+                const row = payload && payload.new;
+                if (row && row.id && payload.eventType !== 'DELETE') {
+                    const same = crashLobby.round && crashLobby.round.id === row.id;
+                    try { applyCrashRound(row, same ? lastCrashBetsRaw : []); } catch (e) { console.error(e); }
+                }
+                scheduleCrashReload();   // и добираем ставки/очередь полным запросом
+            })
             .subscribe();
     } catch (e) {
         console.error('Crash realtime:', e);
@@ -1195,7 +1209,7 @@ function scheduleCrashReload() {
     crashLobby.reloadTimer = setTimeout(() => {
         crashLobby.reloadTimer = null;
         refreshCrashState();
-    }, 400);
+    }, 150);
 }
 
 // Страховочный тик. Основные переходы (старт полёта, краш, конец паузы)
@@ -1380,6 +1394,46 @@ function mapCrashBetsToPlayers(bets) {
 
 let lastCrashBetsRaw = [];
 
+// Первый показ раунда (открытие приложения / возврат из фона): строка в БД могла
+// «застрять» — пока приложение было закрыто, раунд никто не двигал. Поэтому один раз
+// просим сервер довести раунд до актуального состояния и только потом рисуем.
+let crashColdChecked = false;
+
+function crashRoundMaybeStale(round) {
+    if (!round) return false;
+    const now = crashNow();
+    if (round.status === 'flying') return true;   // точка скрыта — только сервер знает, не взорвался ли
+    if (round.status === 'waiting') {
+        const ends = crashParseTime(round.waiting_ends_at);
+        return ends != null && now >= ends;
+    }
+    if (round.status === 'crashed') {
+        const t = crashParseTime(round.crashed_at);
+        return t != null && now >= t + CRASH_RESULT_HOLD_MS;
+    }
+    return false;
+}
+
+async function crashFreshenRound(round) {
+    if (!crashRoundMaybeStale(round) || crashTickMissing) return round;
+    try {
+        let r = crashTickSafeMissing ? null : await supabase.rpc('crash_tick_safe');
+        if (!r || (r.error && isMissingRpcError(r.error))) {
+            if (r) crashTickSafeMissing = true;
+            r = await supabase.rpc('crash_tick');
+            if (r.error && isMissingRpcError(r.error)) { crashTickMissing = true; return round; }
+        }
+        const { data: a } = await supabase.from(CRASH_ROUNDS_TABLE).select('*')
+            .in('status', ['waiting', 'flying']).order('created_at', { ascending: true }).limit(1);
+        if (a && a[0]) return a[0];
+        const { data: l } = await supabase.from(CRASH_ROUNDS_TABLE).select('*')
+            .order('created_at', { ascending: false }).limit(1);
+        return (l && l[0]) || round;
+    } catch (e) {
+        return round;
+    }
+}
+
 async function refreshCrashState() {
     const seq = ++crashLobby.fetchSeq;
     try {
@@ -1418,6 +1472,11 @@ async function refreshCrashState() {
         if (!round) {
             round = await getOrCreateCrashRound();
             if (!round) return;
+        }
+
+        if (!crashColdChecked) {
+            crashColdChecked = true;
+            round = await crashFreshenRound(round);
         }
 
         // 4. Ставки: если запрос упал, игра всё равно идёт со старым списком
@@ -1635,6 +1694,13 @@ function advanceLocalPhase() {
     let want = 'waiting';
     if (dbRank >= 1 || now >= crashGame.startTime) want = 'flying';
     if (dbRank >= 2 || (want === 'flying' && now >= crashGame.crashAt)) want = 'crashed';
+
+    // Точка скрыта, а «полёт» длится дольше физически возможного → раунд уже взорвался
+    // на сервере, мы просто ещё не знаем. Никаких цифр, торопим сервер.
+    if (want === 'flying' && !isFinite(crashGame.crashAt) && now - crashGame.startTime > CRASH_MAX_FLIGHT_MS + 500) {
+        maybeAdvanceCrash();
+        return;
+    }
 
     if (CRASH_PHASE_ORDER[want] <= CRASH_PHASE_ORDER[crashGame.phase]) {
         scheduleCrashPhaseTimer();
@@ -1998,6 +2064,13 @@ function tickCrash() {
     if (now >= crashGame.crashAt) {
         advanceLocalPhase();
         maybeAdvanceCrash();
+        return;
+    }
+
+    if (!isFinite(crashGame.crashAt) && now - crashGame.startTime > CRASH_MAX_FLIGHT_MS + 500) {
+        // Дольше возможного: замираем на последнем значении и ждём ответ сервера
+        maybeAdvanceCrash();
+        crashAnimHandle = requestAnimationFrame(tickCrash);
         return;
     }
 
