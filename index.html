@@ -7,6 +7,22 @@
   письменного разрешения владельца.
 -->
 <head>
+    <base href="/wxs-release/">
+    <!-- РОУТЕР: адрес вида /wxs-release/<режим>. Без известного режима страница пустая и ничего не грузит. -->
+    <script>
+    (function () {
+        var KNOWN = { crash: true };   // сюда добавлять новые режимы: mines, upgrader ...
+        var route = location.pathname.replace(/^\/wxs-release/i, '').replace(/^\/+|\/+$/g, '').toLowerCase();
+        if (!route) { try { route = (new URLSearchParams(location.search).get('app') || '').toLowerCase(); } catch (e) {} }
+        window.WXS_ROUTE = KNOWN[route] ? route : '';
+        if (!window.WXS_ROUTE) {
+            try { window.stop(); } catch (e) {}
+            document.documentElement.innerHTML = '<head><meta charset="UTF-8"><meta name="robots" content="noindex"><title></title></head><body style="margin:0;background:#090909"></body>';
+            return;
+        }
+        document.documentElement.setAttribute('data-route', window.WXS_ROUTE);
+    })();
+    </script>
     <meta charset="UTF-8">
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noai, noimageai">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
