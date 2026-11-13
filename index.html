@@ -274,7 +274,7 @@
 
             <div class="ctrl-box">
                 <div class="mines-bet-header">
-                    <label>СУММА СТАВКИ</label>
+                    <label id="crashBetLabel">СУММА СТАВКИ</label>
                     <div class="card-input-wrap">
                         <input type="number" id="crashBetInput" placeholder="0.10" min="0.1" step="any" inputmode="decimal" onblur="clampBetInputOnBlur(event)" onkeydown="blockInvalidBetKeys(event)">
                         <span class="currency-symbol">$</span>
@@ -285,6 +285,10 @@
                     <button class="pct-btn" onclick="adjustCrashBet(2)">x2</button>
                     <button class="pct-btn" onclick="setCrashMaxBet()">MAX</button>
                 </div>
+                <button type="button" class="crash-fb-btn hidden" id="crashFreebetBtn" onclick="toggleCrashFreebet()">
+                    <span>🎁</span>
+                    <span id="crashFreebetText">Фрибет</span>
+                </button>
             </div>
 
             <button class="mines-main-btn" id="crashActionBtn" onclick="handleCrashAction()" style="margin-top: 14px; width: 100%;">

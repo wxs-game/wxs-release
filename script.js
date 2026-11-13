@@ -1220,6 +1220,7 @@ async function startCrashEngine() {
     });
 
     loadCrashHistoryFromServer().then(renderCrashHistory).catch(() => {});
+    await loadCrashFreebets().catch(() => {});
     await refreshCrashState();
     startCrashClock();
 
@@ -1358,6 +1359,7 @@ function crashCanEditBet() {
 async function queueCrashBet() {
     advanceLocalPhase();
     if (!crashCanQueue() || crashGame.isProcessing) return;
+    if (crashFreebetOn) { showMessage('Фрибет можно поставить только в фазе ожидания раунда.'); return; }
     if (crashLobby.queueMissing) {
         showMessage('Ставки на следующий раунд: таблица crash_queue ещё не создана в базе.');
         return;
@@ -1682,6 +1684,8 @@ function applyCrashRound(round, bets) {
             crashGame.liveBetId = null;
             crashGame.liveBetResolved = false;
             crashGame.myBetRowId = null;
+            crashFbBetId = null;
+            loadCrashFreebets();
         }
         crashGame.roundId = round.id;
         crashGame.phase = 'pending';
@@ -1720,6 +1724,10 @@ function applyCrashRound(round, bets) {
         crashGame.betPlaced = true;
         if (mine.status === 'cashed_out') crashGame.cashedOut = true;
         crashGame.myBetRowId = mine.id;
+        if (!crashFbBetId) {
+            const f = crashFreebets.find(x => x.status === 'active' && String(x.bet_id) === String(mine.id));
+            if (f) crashFbBetId = f.id;
+        }
         // ставка переехала из очереди в этот раунд — подхватываем её запись в ленте
         const ql = crashGame.queuedLive;
         if (ql && round.id !== ql.fromRoundId && Math.abs(ql.amount - mine.amount) < 0.005) {
@@ -2274,6 +2282,120 @@ function resumeCrashVisualsOnOpen() {
    СТАВКА / КЭШАУТ
 ========================= */
 
+
+/* =========================
+   ФРИБЕТ (КРАШ)
+========================= */
+let crashFreebets = [];        // [{ id, amount, status: 'new'|'active', bet_id }]
+let crashFreebetOn = false;    // игрок включил режим «ставлю фрибетом»
+let crashFbBetId = null;       // id фрибета, которым сделана текущая ставка
+let crashFbStartParamUsed = false;
+
+function crashFbNew() {
+    return crashFreebets.filter(f => f.status === 'new');
+}
+
+async function loadCrashFreebets() {
+    const myId = myCrashTelegramId();
+    if (myId == null) return;
+    try {
+        const { data, error } = await supabase
+            .from('crash_freebets')
+            .select('id, amount, status, bet_id')
+            .eq('telegram_id', Number(myId))
+            .in('status', ['new', 'active'])
+            .order('created_at', { ascending: true });
+        if (error || !Array.isArray(data)) return;
+        crashFreebets = data.map(f => ({ id: f.id, amount: roundMoney(f.amount), status: f.status, bet_id: f.bet_id }));
+    } catch (e) { return; }
+
+    // перезашли в приложение с уже поставленным фрибетом — находим его, чтобы кэшаут шёл как фрибет
+    if (!crashFbBetId && crashGame.betPlaced && crashGame.myBetRowId != null) {
+        const f = crashFreebets.find(x => x.status === 'active' && String(x.bet_id) === String(crashGame.myBetRowId));
+        if (f) crashFbBetId = f.id;
+    }
+    // открыли по ссылке из сообщения о фрибете — сразу включаем режим фрибета
+    if (!crashFbStartParamUsed) {
+        crashFbStartParamUsed = true;
+        if (tg?.initDataUnsafe?.start_param === 'freebet' && crashFbNew().length) crashFreebetOn = true;
+    }
+    if (!crashFbNew().length) crashFreebetOn = false;
+    renderCrashFreebet();
+    renderCrashUI();
+}
+
+function toggleCrashFreebet() {
+    if (!crashFbNew().length) return;
+    if (crashGame.phase !== 'waiting' || crashGame.betPlaced || crashGame.queued || crashGame.isProcessing) {
+        showMessage('Фрибет можно поставить только в фазе ожидания раунда.');
+        return;
+    }
+    crashFreebetOn = !crashFreebetOn;
+    renderCrashFreebet();
+    renderCrashUI();
+}
+
+function renderCrashFreebet() {
+    const btn = document.getElementById('crashFreebetBtn');
+    const txt = document.getElementById('crashFreebetText');
+    const input = document.getElementById('crashBetInput');
+    const label = document.getElementById('crashBetLabel');
+    const list = crashFbNew();
+    const canUse = list.length > 0 && crashGame.phase === 'waiting' && !crashGame.betPlaced && !crashGame.queued;
+
+    if (!canUse) crashFreebetOn = false;
+    if (btn) {
+        btn.classList.toggle('hidden', !canUse);
+        btn.classList.toggle('on', crashFreebetOn);
+    }
+    if (canUse && txt) {
+        const fb = list[0];
+        txt.textContent = (crashFreebetOn ? 'Фрибет ' : 'Использовать фрибет ') + fb.amount.toFixed(2) + ' $' +
+            (list.length > 1 ? ' (ещё ' + (list.length - 1) + ')' : '');
+    }
+    if (label) label.textContent = crashFreebetOn ? 'ФРИБЕТ' : 'СУММА СТАВКИ';
+    if (input && crashFreebetOn && list[0]) input.value = list[0].amount.toFixed(2);
+}
+
+async function placeCrashFreebet() {
+    const round = crashLobby.round;
+    if (!round || round.id !== crashGame.roundId || crashGame.phase !== 'waiting' || crashGame.betPlaced || crashGame.queued) return;
+    if (crashGame.isProcessing) return;
+    const fb = crashFbNew()[0];
+    if (!fb) { crashFreebetOn = false; renderCrashFreebet(); return; }
+    if (!lockEconomy()) return;
+
+    crashGame.isProcessing = true;
+    const myName = document.getElementById('username')?.textContent?.trim() || 'Игрок';
+    const srv = await crashRpc('crash_freebet_bet', { p_fb_id: fb.id, p_name: myName, p_avatar: getMyIceArenaAvatar() });
+    if (!srv.ok) {
+        showMessage(srv.error || 'Не удалось поставить фрибет. Попробуйте ещё раз.');
+        crashGame.isProcessing = false;
+        unlockEconomy();
+        loadCrashFreebets();
+        scheduleCrashReload();
+        return;
+    }
+    // баланс не меняется: фрибет — не деньги игрока
+    if (srv.balance != null) setUIBalance(srv.balance);
+
+    crashGame.bet = fb.amount;
+    crashGame.betPlaced = true;
+    crashGame.cashedOut = false;
+    crashGame.liveBetResolved = false;
+    crashGame.myBetRowId = srv.bet_id ?? null;
+    crashFbBetId = fb.id;
+    fb.status = 'active';
+    fb.bet_id = srv.bet_id ?? null;
+    crashFreebetOn = false;
+
+    crashGame.isProcessing = false;
+    unlockEconomy();
+    renderCrashFreebet();
+    renderCrashUI();
+    scheduleCrashReload();
+}
+
 async function placeCrashBet() {
     const round = crashLobby.round;
     if (!round || round.id !== crashGame.roundId || crashGame.phase !== 'waiting' || crashGame.betPlaced || crashGame.queued) return;
@@ -2337,7 +2459,9 @@ async function cashOutCrash() {
     // Сервер сам находит ставку, считает множитель по своему времени и платит.
     // Клиент шлёт лишь «на каком иксе нажал» — сервер возьмёт минимум из него и своего.
     const seenMult = computeCrashMultAt(crashNow() - crashGame.startTime, crashGame.crashPoint);
-    const srv = await crashRpc('crash_cashout', { p_mult: seenMult });
+    const srv = crashFbBetId
+        ? await crashRpc('crash_freebet_cashout', { p_fb_id: crashFbBetId, p_mult: seenMult })
+        : await crashRpc('crash_cashout', { p_mult: seenMult });
     if (!srv.ok) {
         restoreBalanceState(snapshot);
         showMessage(srv.error || "Не удалось забрать выигрыш. Проверьте соединение.");
@@ -2354,6 +2478,10 @@ async function cashOutCrash() {
     if (mult > currentMaxWin) currentMaxWin = mult;
     setUIBalance(srv.balance);
 
+    if (crashFbBetId) {
+        crashFreebets = crashFreebets.filter(f => f.id !== crashFbBetId);
+        crashFbBetId = null;
+    }
     crashGame.cashedOut = true;
     crashGame.cashoutMult = mult;
     crashGame.cashoutWin = winAmount;
@@ -2378,7 +2506,7 @@ function handleCrashAction() {
     advanceLocalPhase();
 
     if (crashGame.phase === 'waiting' && !crashGame.betPlaced && !crashGame.queued) {
-        placeCrashBet();
+        if (crashFreebetOn) placeCrashFreebet(); else placeCrashBet();
     } else if (crashGame.phase === 'flying' && crashGame.betPlaced && !crashGame.cashedOut) {
         cashOutCrash();
     } else if (crashCanQueue()) {
@@ -2563,6 +2691,7 @@ function renderCrashUI(heavy = true) {
         dom.statusEl.textContent = `Крах на ${crashShownPoint().toFixed(2)}x · Следующий раунд скоро`;
         dom.multEl.textContent = crashShownPoint().toFixed(2) + 'x';
         dom.multEl.style.color = '#e74c3c';
+        renderCrashFreebet();
         if (dom.betInput) dom.betInput.disabled = !!crashGame.queued;
         dom.actionBtn.textContent = crashGame.queued ? 'Ставка в очереди ✓' : 'Поставить на след. раунд';
         dom.actionBtn.disabled = !!crashGame.queued;
@@ -2573,8 +2702,9 @@ function renderCrashUI(heavy = true) {
         // Тяжёлая подготовка сцены — в enterWaitingVisual() (один раз),
         // цифры отсчёта — в renderCrashCountdown(). Здесь только кнопка.
         const hold = crashGame.betPlaced || !!crashGame.queued;
-        if (dom.betInput) dom.betInput.disabled = hold;
-        dom.actionBtn.textContent = crashGame.betPlaced ? 'Ставка принята' : (crashGame.queued ? 'Ставка в очереди ✓' : 'Сделать ставку');
+        renderCrashFreebet();
+        if (dom.betInput) dom.betInput.disabled = hold || crashFreebetOn;
+        dom.actionBtn.textContent = crashGame.betPlaced ? 'Ставка принята' : (crashGame.queued ? 'Ставка в очереди ✓' : (crashFreebetOn && crashFbNew()[0] ? 'Поставить фрибет ' + crashFbNew()[0].amount.toFixed(2) + ' $' : 'Сделать ставку'));
         dom.actionBtn.disabled = hold;
         return;
     }
@@ -2603,11 +2733,12 @@ function renderCrashUI(heavy = true) {
         }
 
         drawCrashTrail(currentM);
+        if (crashFreebetOn || !document.getElementById('crashFreebetBtn')?.classList.contains('hidden')) renderCrashFreebet();
         setDotOpacity(dom, '1');
         setDotLive(dom, true);
 
         if (crashGame.betPlaced && !crashGame.cashedOut) {
-            const potential = (crashGame.bet * currentM).toFixed(2);
+            const potential = (crashFbBetId ? crashGame.bet * (currentM - 1) : crashGame.bet * currentM).toFixed(2);
             dom.actionBtn.textContent = `Забрать ${potential}$`;
             dom.actionBtn.disabled = false;
         } else if (crashGame.queued) {
