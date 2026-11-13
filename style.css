@@ -33,6 +33,7 @@ body {
     overflow-y: auto;
     overscroll-behavior: none;
     touch-action: pan-y;
+    font-weight: 800;            /* жирный шрифт по умолчанию везде (как в Telegram) */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -40,6 +41,7 @@ body {
 button, input, select, textarea {
     font-family: inherit;
     font-size: inherit;
+    font-weight: inherit;
     outline: none;
     border: none;
     background: transparent;
@@ -501,7 +503,7 @@ main {
     margin-top: 1px;
     color: #888888;
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 800;
 }
 
 .level-line {
@@ -746,7 +748,7 @@ main {
 .live-wins-empty-pinned {
     font-size: 12px;
     color: #a67b2e;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 /* Свайпаемый список последних крупных выигрышей — до 10 штук, без анимации */
@@ -799,7 +801,7 @@ main {
     overflow: hidden;
     white-space: nowrap;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 800;
     color: #888888;
     line-height: 1.15;
 }
@@ -827,7 +829,7 @@ main {
 
 .live-wins-arrow {
     color: #555555;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 .live-wins-item-icon {
@@ -843,7 +845,7 @@ main {
     align-items: center;
     font-size: 12px;
     color: #666666;
-    font-weight: 700;
+    font-weight: 800;
     padding: 0 6px;
 }
 
@@ -913,7 +915,7 @@ main {
 .action small {
     color: #666666;
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 800;
 }
 
 /* ==========================================
@@ -1051,7 +1053,7 @@ main {
 .coef-item .step-num {
     font-size: 9px;
     color: #666666;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 .coef-item .mult-val {
@@ -1509,7 +1511,7 @@ body.fairness-modal-open {
 .profile-tag {
     color: #777777;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 800;
     margin-bottom: 20px;
 }
 
@@ -1522,7 +1524,7 @@ body.fairness-modal-open {
     justify-content: space-between;
     color: #aaaaaa;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 800;
     margin-bottom: 8px;
 }
 
@@ -1600,7 +1602,7 @@ body.fairness-modal-open {
 .stat-lbl {
     font-size: 12px;
     color: #666666;
-    font-weight: 600;
+    font-weight: 800;
 }
 
 .profile-balance-banner {
@@ -1612,7 +1614,7 @@ body.fairness-modal-open {
     font-size: 11px;
     display: block;
     margin-bottom: 2px;
-    font-weight: 600;
+    font-weight: 800;
 }
 
 .p-bal-left strong {
@@ -1900,7 +1902,7 @@ body.fairness-modal-open {
 .share-preview-via {
     font-size: 12px;
     color: #8a8a92;
-    font-weight: 700;
+    font-weight: 800;
     margin-bottom: 8px;
 }
 
@@ -1940,7 +1942,7 @@ body.fairness-modal-open {
 
 .share-preview-photo-sub {
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 800;
     color: rgba(255, 255, 255, 0.78);
 }
 
@@ -1949,7 +1951,7 @@ body.fairness-modal-open {
     font-size: 14px;
     line-height: 1.45;
     color: #f2f2f2;
-    font-weight: 600;
+    font-weight: 800;
 }
 
 .share-preview-inline-btn {
@@ -1975,7 +1977,7 @@ body.fairness-modal-open {
     color: #888888;
     font-size: 13px;
     line-height: 1.4;
-    font-weight: 600;
+    font-weight: 800;
 }
 
 .share-invite-btn {
@@ -2081,7 +2083,7 @@ body.fairness-modal-open {
 .history-header small {
     color: #666666;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 .history-list {
@@ -2264,13 +2266,13 @@ body.fairness-modal-open {
 
 .nav-item small {
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 800;
     letter-spacing: -0.1px;
     line-height: 1;
     opacity: 0.58;
     transition: opacity 0.25s ease;
 }
-.nav-item.on small { font-weight: 700; opacity: 1; }
+.nav-item.on small { font-weight: 800; opacity: 1; }
 
 /* Плашка под активным разделом (в покое) */
 .nav-pill {
@@ -2524,7 +2526,7 @@ body.fairness-modal-open {
 
 .mines-bet-header label {
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 800;
     color: #888888;
     letter-spacing: 0.5px;
     margin: 0;
@@ -2552,7 +2554,7 @@ body.fairness-modal-open {
     outline: none;
     color: #ffffff;
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 800;
     text-align: right;
     padding: 0;
     margin: 0;
@@ -2567,7 +2569,7 @@ body.fairness-modal-open {
 .mines-bet-header .card-input-wrap .currency-symbol {
     color: #666666;
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 800;
     margin-left: 5px;
     line-height: 1;
     display: flex;
@@ -2720,7 +2722,7 @@ body.fairness-modal-open {
     text-align: center;
     color: rgba(255,255,255,0.55);
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 800;
     line-height: 1.5;
     padding: 20px;
     z-index: 3;
@@ -3006,7 +3008,7 @@ body.ice-history-modal-open {
     text-align: center;
     color: rgba(255,255,255,0.45);
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 800;
     padding: 30px 10px;
 }
 
@@ -3043,7 +3045,7 @@ body.ice-history-modal-open {
 
 .ice-history-row-time {
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 800;
     color: #777777;
     margin-left: 6px;
 }
@@ -3124,7 +3126,7 @@ body.ice-history-modal-open {
 
 .ice-history-row-stat-lbl {
     font-size: 9.5px;
-    font-weight: 700;
+    font-weight: 800;
     color: #777777;
     text-transform: uppercase;
 }
@@ -3186,7 +3188,7 @@ body.ice-history-modal-open {
     align-items: center;
     justify-content: space-between;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 800;
     color: #999999;
     border-bottom: 1px solid rgba(255,255,255,0.06);
     padding-bottom: 8px;
@@ -3371,7 +3373,7 @@ body.ice-history-modal-open {
     padding: 14px 10px;
     text-align: center;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 800;
     color: #555555;
 }
 
@@ -3531,7 +3533,7 @@ body.ice-history-modal-open {
     min-height: 16px;
     margin-top: 2px;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 800;
     color: #666666;
     text-align: center;
 }
@@ -3792,7 +3794,7 @@ input, textarea {
 .dice-mode-coef {
     margin-left: 5px;
     opacity: 0.75;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 /* Выбранная / активная плитка — жёлтая */
@@ -4080,7 +4082,7 @@ input, textarea {
     background: rgba(255, 255, 255, 0.04);
     color: rgba(255, 255, 255, 0.78);
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 800;
     -webkit-tap-highlight-color: transparent;
     transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease,
                 box-shadow 0.25s ease, transform 0.2s cubic-bezier(0.3, 1.5, 0.5, 1);
@@ -4092,7 +4094,7 @@ input, textarea {
     color: #1a1000;
     box-shadow: 0 6px 18px rgba(255, 150, 0, 0.3);
 }
-.lb-chip-sm { padding: 9px 17px; font-size: 13.5px; font-weight: 600; }
+.lb-chip-sm { padding: 9px 17px; font-size: 13.5px; font-weight: 800; }
 .lb-chip-sm.active {
     background: rgba(255, 190, 0, 0.12);
     border-color: rgba(255, 190, 0, 0.55);
@@ -4123,7 +4125,7 @@ input, textarea {
     background: rgba(255, 255, 255, 0.03);
     color: rgba(255, 255, 255, 0.82);
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 800;
     overflow: hidden;
     transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
 }
@@ -4169,7 +4171,7 @@ input, textarea {
 .lb-col--2 .lb-av { border-color: rgba(200, 210, 230, 0.85); }
 .lb-name {
     max-width: 100%;
-    font-size: 16px; font-weight: 700; color: #fff;
+    font-size: 16px; font-weight: 800; color: #fff;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     margin-top: 4px;
 }
@@ -4206,14 +4208,14 @@ input, textarea {
     animation-delay: calc(var(--d, 0) * 1ms);
 }
 .lb-row.me { background: linear-gradient(90deg, rgba(255, 170, 0, 0.12), #101010 70%); border-color: rgba(255, 190, 0, 0.5); }
-.lb-rank { width: 26px; text-align: center; font-size: 15px; font-weight: 700; color: rgba(255, 255, 255, 0.45); flex: 0 0 auto; }
+.lb-rank { width: 26px; text-align: center; font-size: 15px; font-weight: 800; color: rgba(255, 255, 255, 0.45); flex: 0 0 auto; }
 .lb-row .lb-av { width: 46px; height: 46px; font-size: 19px; border-width: 1.5px; }
 .lb-row .lb-name { flex: 1; margin: 0; font-size: 17px; text-align: left; }
 .lb-row .lb-amt { font-size: 17px; flex: 0 0 auto; }
 .lb-row .lb-dollar { width: 20px; height: 20px; }
 
 .lb-empty { padding: 36px 16px; text-align: center; color: rgba(255, 255, 255, 0.5); font-size: 15px; animation: lbFadeUp 0.4s ease backwards; }
-.lb-retry { margin-top: 12px; padding: 10px 22px; border-radius: 999px; border: 1px solid rgba(255, 190, 0, 0.5); background: transparent; color: #ffd24d; font-weight: 700; }
+.lb-retry { margin-top: 12px; padding: 10px 22px; border-radius: 999px; border: 1px solid rgba(255, 190, 0, 0.5); background: transparent; color: #ffd24d; font-weight: 800; }
 .lb-skel { height: 70px; border-radius: 22px; background: #101010; border: 1px solid #1a1a1a; animation: lbPulse 1.2s ease-in-out infinite; }
 
 @keyframes lbRise { from { transform: scaleY(0); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
@@ -4487,7 +4489,7 @@ body.anim-page .top {
     margin-top: 10px;
     color: #8b8b93;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 800;
     text-align: center;
 }
 
@@ -4515,7 +4517,7 @@ body.anim-page .top {
     font-weight: 950;
     letter-spacing: 0.6px;
 }
-.vip-tier-sub { color: #9a9aa2; font-size: 12px; font-weight: 700; margin-top: 3px; }
+.vip-tier-sub { color: #9a9aa2; font-size: 12px; font-weight: 800; margin-top: 3px; }
 .vip-progress {
     height: 12px;
     margin-top: 18px;
@@ -4533,7 +4535,7 @@ body.anim-page .top {
     box-shadow: 0 0 16px rgba(255, 200, 0, 0.5);
     transition: width 0.6s cubic-bezier(.22, 1, .36, 1);
 }
-.vip-progress-text { margin-top: 8px; color: #8d8d95; font-size: 11px; font-weight: 700; }
+.vip-progress-text { margin-top: 8px; color: #8d8d95; font-size: 11px; font-weight: 800; }
 .vip-perks {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -4549,7 +4551,7 @@ body.anim-page .top {
 }
 .vip-perk small { display: block; color: #77777f; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
 .vip-perk b { display: block; margin-top: 4px; font-size: 16px; color: #fff; }
-.vip-perk span { display: block; margin-top: 2px; color: #9a9aa2; font-size: 11px; font-weight: 600; line-height: 1.35; }
+.vip-perk span { display: block; margin-top: 2px; color: #9a9aa2; font-size: 11px; font-weight: 800; line-height: 1.35; }
 .vip-ranks { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .vip-rank-row {
     display: flex;
@@ -4568,7 +4570,7 @@ body.anim-page .top {
 .vip-rank-row.current .vip-rank-dot { background: #ffc800; box-shadow: 0 0 12px rgba(255, 200, 0, 0.65); }
 .vip-rank-info { flex: 1; min-width: 0; }
 .vip-rank-info b { font-size: 14px; color: #f4f4f4; }
-.vip-rank-info small { display: block; margin-top: 2px; color: #7f7f87; font-size: 11px; font-weight: 600; }
+.vip-rank-info small { display: block; margin-top: 2px; color: #7f7f87; font-size: 11px; font-weight: 800; }
 .vip-rank-check { color: #ffc800; font-size: 16px; font-weight: 900; }
 .vip-claim-card { margin-top: 14px; }
 .vip-claim-card .main-action-btn { margin-top: 14px; }
@@ -4586,7 +4588,7 @@ body.anim-page .top {
     margin-bottom: 12px;
 }
 .tasks-summary b { display: block; color: #ffc800; font-size: 24px; font-weight: 950; }
-.tasks-summary small { display: block; margin-top: 2px; color: #8d8d95; font-size: 11px; font-weight: 700; }
+.tasks-summary small { display: block; margin-top: 2px; color: #8d8d95; font-size: 11px; font-weight: 800; }
 .tasks-summary-icon { font-size: 34px; line-height: 1; }
 .tasks-list { display: flex; flex-direction: column; gap: 10px; }
 .task-card {
@@ -4607,7 +4609,7 @@ body.anim-page .top {
 }
 .task-body { flex: 1; min-width: 0; }
 .task-title { font-size: 14px; font-weight: 800; color: #fff; }
-.task-desc { margin-top: 2px; color: #818189; font-size: 11px; font-weight: 600; line-height: 1.35; }
+.task-desc { margin-top: 2px; color: #818189; font-size: 11px; font-weight: 800; line-height: 1.35; }
 .task-progress {
     height: 6px;
     margin-top: 8px;
@@ -4647,14 +4649,14 @@ body.anim-page .top {
     margin-top: 10px;
     color: #8d8d95;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 800;
 }
 .daily-bonus-status b { color: #ffc800; }
 .promo-hint {
     margin-top: 10px;
     color: #74747c;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 800;
     line-height: 1.4;
 }
 .promo-hint code { color: #ffc800; background: rgba(255, 200, 0, 0.08); padding: 1px 5px; border-radius: 5px; }
@@ -4670,7 +4672,7 @@ body.anim-page .top {
     border: 1px solid rgba(255, 200, 0, 0.2);
     color: #c9c9cf;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 800;
     line-height: 1.45;
 }
 .wallet-note b { color: #ffc800; }
@@ -4827,8 +4829,8 @@ img.img-pending { opacity: 0; }
 }
 .win-popup-icon {
     flex: 0 0 auto;
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;

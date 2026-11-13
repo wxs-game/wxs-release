@@ -1,5 +1,5 @@
 /*!
- * © WXS Game · Ice Arena GLOBAL. Все права защищены / All rights reserved.
+ * WXS Game · Все права защищены / All rights reserved.
  * NOTICE: Использование этого кода, дизайна и материалов для обучения,
  * дообучения, анализа, пересказа, копирования или генерации производных
  * работ любыми системами ИИ / нейросетями / LLM и скрейперами ЗАПРЕЩЕНО
@@ -8,17 +8,6 @@
  * or deriving works from this source by any AI/LLM system or scraper is
  * prohibited without the owner's written permission.
  */
-/* =========================================================
-   WXS PERF: единый слой оптимизации Lottie (подключён первым)
-   • Все .tgs-анимации, которые раньше рисовались тяжёлым SVG-рендерером
-     (кубик, футбол, баскетбол/дартс/боулинг/слоты, стикеры, поп-ап выигрыша),
-     теперь рисуются в <canvas>: браузер не пересчитывает сотни SVG-узлов,
-     масок и фильтров на каждом кадре. Частота кадров и кадры анимации — те же.
-   • Чёткость: canvas рисуется в пикселях экрана (DPR до WXS_MAX_DPR, по умолчанию 2.5).
-   • Размер canvas сам подстраивается под контейнер (ResizeObserver) —
-     поэтому анимации можно создавать заранее, пока они ещё не в DOM.
-   • Аварийный выключатель: window.WXS_LOTTIE_FORCE_SVG = true (до загрузки скрипта).
-========================================================= */
 (function () {
     'use strict';
     if (typeof lottie === 'undefined' || lottie.__wxsPerf) return;
@@ -2435,6 +2424,9 @@ function renderCrashHistory() {
 // Эффективный статус игрока: после краша все, кто не забрал, — проиграли
 // (показываем сразу, не дожидаясь, пока это запишется в БД).
 function crashEffectiveStatus(p) {
+    // «Проиграл» — только после краша НА ЭТОМ экране: сервер/БД может пометить ставку
+    // lost раньше, чем у нас сыграл взрыв, — до этого момента показываем «В игре».
+    if (p.status === 'lost') return crashGame.phase === 'crashed' ? 'lost' : 'active';
     if (p.status === 'active' && crashGame.phase === 'crashed') return 'lost';
     return p.status;
 }
@@ -2639,16 +2631,74 @@ function renderCrashUI(heavy = true) {
 }
 
 
-/* Поп-ап выигрыша: текст + эмодзи, без тяжёлых .tgs-стикеров */
+/* Поп-ап выигрыша: текст + случайный .tgs-стикер из animations/stickers (win1..win5) */
 (function () {
     const SHOW_MS = 4000;
-    let root = null, textEl = null, barEl = null, hideTimer = null;
+    const STICKERS = [1, 2, 3, 4, 5].map(i => 'animations/stickers/win' + i + '.tgs');
+    const FALLBACK_ICON = '🎉';
+    const dataCache = {};   // src -> Promise<объект Lottie> (качаем и распаковываем один раз)
+    let root = null, iconEl = null, textEl = null, barEl = null, hideTimer = null;
+    let anim = null, showToken = 0, lastIdx = -1;
+
+    // .tgs = gzip-архив с Lottie JSON
+    async function gunzip(buf) {
+        if (typeof DecompressionStream === 'undefined') throw new Error('no DecompressionStream');
+        const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
+        return await new Response(stream).text();
+    }
+    function loadSticker(src) {
+        if (!dataCache[src]) {
+            dataCache[src] = fetch(src)
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+                .then(buf => {
+                    const u8 = new Uint8Array(buf);
+                    // иногда .tgs отдают уже распакованным JSON — тоже поддержим
+                    if (u8[0] === 0x1f && u8[1] === 0x8b) return gunzip(buf);
+                    return new TextDecoder().decode(u8);
+                })
+                .then(txt => JSON.parse(txt))
+                .catch(err => { delete dataCache[src]; throw err; });
+        }
+        return dataCache[src];
+    }
+    function pickSticker() {
+        let i;
+        do { i = Math.floor(Math.random() * STICKERS.length); } while (STICKERS.length > 1 && i === lastIdx);
+        lastIdx = i;
+        return STICKERS[i];
+    }
+    function destroyAnim() {
+        if (anim) { try { anim.destroy(); } catch (e) {} anim = null; }
+    }
+    function setIconEmoji() {
+        destroyAnim();
+        iconEl.textContent = FALLBACK_ICON;
+    }
+    function playSticker(token) {
+        const src = pickSticker();
+        loadSticker(src).then(data => {
+            if (token !== showToken || typeof lottie === 'undefined') return;   // за это время поп-ап уже обновили/скрыли
+            destroyAnim();
+            iconEl.textContent = '';
+            anim = lottie.loadAnimation({
+                container: iconEl,
+                renderer: 'canvas',
+                loop: true,
+                autoplay: true,
+                animationData: JSON.parse(JSON.stringify(data)),   // lottie мутирует данные — даём копию
+                rendererSettings: { clearCanvas: true, progressiveLoad: false, preserveAspectRatio: 'xMidYMid meet' }
+            });
+        }).catch(() => {
+            if (token === showToken) setIconEmoji();
+        });
+    }
     function build() {
         if (root) return;
         root = document.createElement('div');
         root.className = 'win-popup';
-        root.innerHTML = '<div class="win-popup-icon">🎉</div><div class="win-popup-text"></div><div class="win-popup-bar"><i></i></div>';
+        root.innerHTML = '<div class="win-popup-icon"></div><div class="win-popup-text"></div><div class="win-popup-bar"><i></i></div>';
         document.body.appendChild(root);
+        iconEl = root.querySelector('.win-popup-icon');
         textEl = root.querySelector('.win-popup-text');
         barEl = root.querySelector('.win-popup-bar i');
     }
@@ -2666,8 +2716,18 @@ function renderCrashUI(heavy = true) {
         void root.offsetWidth;
         barEl.style.animation = 'winPopupBar ' + SHOW_MS + 'ms linear forwards';
         root.classList.add('show');
-        hideTimer = setTimeout(() => root.classList.remove('show'), SHOW_MS);
+
+        const token = ++showToken;
+        setIconEmoji();          // пока стикер грузится (в первый раз) — эмодзи
+        playSticker(token);
+
+        hideTimer = setTimeout(() => {
+            root.classList.remove('show');
+            setTimeout(() => { if (token === showToken) destroyAnim(); }, 400);
+        }, SHOW_MS);
     };
+    // подгружаем стикеры заранее, чтобы первый выигрыш не мигал эмодзи
+    setTimeout(() => STICKERS.forEach(src => loadSticker(src).catch(() => {})), 3000);
 })();
 
 document.addEventListener('visibilitychange', function () {
