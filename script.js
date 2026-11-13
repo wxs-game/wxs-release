@@ -1959,30 +1959,11 @@ function enterWaitingVisual() {
     renderCrashUI();
 }
 
-// Номер раунда для показа: +1 только за раунды, в которых была хотя бы одна ставка.
-// game_number в БД — identity и растёт на каждый новый раунд (даже пустой), поэтому
-// считаем сами: сколько раундов ДО текущего имели ставки, плюс 1. Пустые раунды
-// подряд показывают один и тот же номер, пока кто-то не поставит.
-const crashNumCache = { roundId: null, base: null, loading: false };
+// Номер игры для показа: game_number из БД (identity) растёт на КАЖДЫЙ новый раунд,
+// в том числе пустой, поэтому показываем его напрямую — без запросов и без прочерка.
 function crashDisplayNumber(round) {
     if (!round || !round.game_number) return null;
-    if (crashNumCache.roundId === round.id && crashNumCache.base !== null) return crashNumCache.base + 1;
-    if (crashNumCache.loading !== round.id) {
-        crashNumCache.loading = round.id;
-        supabase
-            .from(CRASH_ROUNDS_TABLE)
-            .select('id, ' + CRASH_BETS_TABLE + '!inner(id)', { count: 'exact', head: true })
-            .lt('game_number', round.game_number)
-            .then(({ count, error }) => {
-                if (crashNumCache.loading === round.id) crashNumCache.loading = false;
-                if (error || count === null || count === undefined) { console.error('Crash round number:', error); return; }
-                crashNumCache.roundId = round.id;
-                crashNumCache.base = count;
-                updateCrashTopbar();
-            });
-    }
-    // пока считаем — показываем прошлое значение для того же раунда, иначе прочерк
-    return crashNumCache.base !== null && crashNumCache.roundId === round.id ? crashNumCache.base + 1 : null;
+    return Number(round.game_number) || null;
 }
 
 // Верхняя панель краша: БАНК (все ставки раунда), ИГРА (#номер раунда
