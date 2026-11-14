@@ -5555,3 +5555,48 @@ html[data-route="upgrader"] .fairness-overlay { display: none; }
     will-change: left;
 }
 #upgraderPage .upg-slider-control .upg-slider { touch-action: pan-y; }
+
+
+/* ---- правка 2: центр компактнее (внутри диска), крупная стрелка, золотой ползунок ---- */
+.upg-center { top: 52.2%; width: 44%; }
+.upg-emblem { width: 25%; margin-bottom: 5px; }
+.upg-center-value { font-size: clamp(26px,8.2vw,38px); }
+.upg-center-coef { font-size: clamp(13px,3.9vw,17px); margin-top: 5px; }
+.upg-center-caption { font-size: clamp(7px,1.9vw,9px); margin-top: 9px; letter-spacing: .18em; }
+.upg-center.is-result .upg-center-value { font-size: clamp(20px,6vw,27px); }
+.upg-liquid-thumb {
+    background: linear-gradient(155deg, #fff3b5, #f0c93c 55%, #ffe98a);
+    border-color: rgba(255,240,170,.9);
+    box-shadow: 0 3px 10px #000a, 0 0 12px rgba(255,200,0,.35), inset 0 1px 1px #fff;
+}
+
+
+/* =====================================================
+   ПРАВКА 3: только колесо, центр 1:1 с референсом, рабочий слайдер
+===================================================== */
+.upg-wheel-frame {
+    margin: 0 0 14px; padding: 0;
+    border: 0; border-radius: 0; background: none; box-shadow: none;
+}
+.upg-wheel-frame::before { display: none; }
+.upg-wheel-frame .upg-stage-heading { display: none; }
+
+.upg-stack { container-type: inline-size; }
+.upg-center {
+    position: absolute; inset: 0; left: 0; top: 0; width: auto;
+    transform: none; display: block; text-align: center;
+}
+.upg-center > * { position: absolute; margin: 0; left: 0; right: 0; text-align: center; line-height: 1; white-space: nowrap; }
+.upg-emblem { left: 43.15cqw; right: auto; top: 36.6cqw; width: 13.7cqw; height: auto; margin: 0; }
+.upg-center-value { top: 49.8cqw; font-size: 9cqw; letter-spacing: -.02em; }
+.upg-center-coef { top: 60.4cqw; font-size: 4.2cqw; letter-spacing: .01em; margin: 0; color: #eac31a; }
+.upg-center-caption { top: 66.5cqw; font-size: 2.5cqw; letter-spacing: .14em; margin: 0; color: #8c8c91; }
+.upg-center.is-result .upg-center-value { top: 51.2cqw; font-size: 6.4cqw; }
+.upg-center.is-result .upg-center-caption { font-size: 2.1cqw; letter-spacing: .1em; }
+.upg-rotor svg { filter: drop-shadow(0 0 4px rgba(255,200,0,.3)); }
+
+/* слайдер: ввод целиком у нас, нативный input только для клавиатуры/доступности */
+.upg-slider-control { touch-action: none; cursor: ew-resize; user-select: none; -webkit-user-select: none; }
+#upgraderPage .upg-slider-control .upg-slider { pointer-events: none; }
+.upg-slider-visual { contain: none; }
+.upg-slider-control.is-drag .upg-liquid-thumb { transform: translate(-50%,-50%) scale(1.12,1.08); }

@@ -3098,7 +3098,7 @@ const UPG_HOUSE_EDGE = 0.05;
 const UPG_MIN_CHANCE = 1;
 const UPG_MAX_CHANCE = 90;
 const UPG_STEP = 5;
-const UPG_START = 108;       // где стрелка стоит до запуска
+const UPG_START = 348;       // где стрелка стоит до запуска
 const UPG_WINDUP = 12;       // замах назад, градусы
 const UPG_T = { pause: 400, windup: 600, spin: 6000, land: 390 };   // мс, как в боте
 const UPG_FONT = '"Carlito","Helvetica Neue",Arial,sans-serif';
@@ -3152,12 +3152,12 @@ function upgWheel() {
     x.fillStyle = '#000'; x.beginPath(); x.arc(360, 360, 286, 0, TAU); x.fill();
     x.restore();
 
-    // внешние риски (как на макете: редкие серые штрихи вокруг диска)
-    for (let i = 0; i < 48; i++) {
-        const major = i % 4 === 0;
-        const [x1, y1] = upgPt(305, i * 7.5);
-        const [x2, y2] = upgPt(major ? 327 : 320, i * 7.5);
-        x.strokeStyle = major ? '#5b5b60' : '#46464a';
+    // внешние риски: через 5°, каждая шестая длиннее
+    for (let i = 0; i < 72; i++) {
+        const major = i % 6 === 0;
+        const [x1, y1] = upgPt(major ? 304 : 308, i * 5);
+        const [x2, y2] = upgPt(major ? 328 : 323, i * 5);
+        x.strokeStyle = major ? '#58585c' : '#47474b';
         x.lineWidth = major ? 3.8 : 3;
         x.lineCap = 'butt';
         x.beginPath(); x.moveTo(x1, y1); x.lineTo(x2, y2); x.stroke();
@@ -3185,34 +3185,32 @@ function upgSectorPath(x, chance) {
 }
 
 // Красный сектор + тонкое кольцо по внутреннему краю (рисуется поверх колеса)
-function upgPaintSector(x, chance) {
+function upgPaintSector(x, chance, fast) {
     const half = chance * 1.8, k = Math.PI / 180, TAU = Math.PI * 2;
     const begin = (180 - half) * k - Math.PI / 2, end = (180 + half) * k - Math.PI / 2;
     const S = upg.size / 720;
     const g = x.createLinearGradient(0, 246, 0, 632);
     g.addColorStop(0, '#ffe41f'); g.addColorStop(.40, '#ffd80d'); g.addColorStop(.60, '#ffb613');
     g.addColorStop(.80, '#ff8520'); g.addColorStop(1, '#ff3a22');
-    // сам сектор + жёлтое свечение
     x.save();
-    x.shadowColor = 'rgba(255,198,0,.6)'; x.shadowBlur = 26 * S;
+    if (!fast) { x.shadowColor = 'rgba(255,198,0,.55)'; x.shadowBlur = 24 * S; }
     upgSectorPath(x, chance); x.fillStyle = g; x.fill();
     x.restore();
-    // тень от центрального диска на сектор
+    // тёмное гало от центрального диска
     x.save();
     upgSectorPath(x, chance); x.clip();
-    const rg = x.createRadialGradient(360, 360, 183, 360, 360, 238);
-    rg.addColorStop(0, 'rgba(0,0,0,.55)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+    const rg = x.createRadialGradient(360, 360, 183, 360, 360, 216);
+    rg.addColorStop(0, 'rgba(0,0,0,.8)'); rg.addColorStop(.45, 'rgba(0,0,0,.36)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
     x.fillStyle = rg; x.fillRect(0, 0, 720, 720);
     x.restore();
-    // кромка центрального диска
     x.beginPath(); x.arc(360, 360, 183, 0, TAU);
-    x.strokeStyle = '#303035'; x.lineWidth = 2; x.stroke();
-    // тонкое золотое кольцо снаружи сектора
+    x.strokeStyle = '#2c2c31'; x.lineWidth = 2; x.stroke();
+    // тонкое золотое кольцо на ободке
     const rg2 = x.createLinearGradient(0, 246, 0, 632);
     rg2.addColorStop(0, '#ffd21f'); rg2.addColorStop(.55, '#ffb21c'); rg2.addColorStop(1, '#ff8a1a');
     x.save();
-    x.shadowColor = 'rgba(255,165,0,.75)'; x.shadowBlur = 10 * S;
-    x.beginPath(); x.arc(360, 360, 292, begin, end);
+    if (!fast) { x.shadowColor = 'rgba(255,165,0,.6)'; x.shadowBlur = 8 * S; }
+    x.beginPath(); x.arc(360, 360, 284.5, begin, end);
     x.strokeStyle = rg2; x.lineWidth = 3.6; x.lineCap = 'round'; x.stroke();
     x.restore();
 }
@@ -3313,13 +3311,14 @@ function upgDraw() {
 
     // 1) колесо + сектор (перерисовка только пока сектор реально меняется)
     const shown = upg.shown;
-    const sKey = shown.toFixed(2) + ':' + upg.size;
+    const fast = !!(upg.sliding || Math.abs(upg.chance - shown) > 0.04);
+    const sKey = shown.toFixed(2) + ':' + upg.size + (fast ? 'f' : '');
     if (upg.sceneKey !== sKey) {
         base.setTransform(1, 0, 0, 1, 0, 0);
         base.clearRect(0, 0, upg.size, upg.size);
         base.drawImage(upgWheel(), 0, 0);
         base.setTransform(S, 0, 0, S, 0, 0);
-        upgPaintSector(base, shown);
+        upgPaintSector(base, shown, fast);
         upg.sceneKey = sKey;
     }
 
@@ -3525,7 +3524,7 @@ function upgInit() {
     const rotor = document.createElement('div');
     rotor.className = 'upg-rotor';
     rotor.setAttribute('aria-hidden','true');
-    rotor.innerHTML = `<svg viewBox="0 0 720 720"><defs><linearGradient id="upg-arrow-gold" x1=".3" y1="1" x2=".65" y2="0"><stop stop-color="#fff7b8"/><stop offset=".34" stop-color="#ffe21a"/><stop offset="1" stop-color="#ffc400"/></linearGradient></defs><path d="M360 160 345 91 357 46 362 94 377 81 367 102Z" fill="url(#upg-arrow-gold)"/><path d="M360 160 357 47 362 94Z" fill="#fff8d8" fill-opacity=".85"/><path d="M360 160 345 91 355 104Z" fill="#ffb300"/></svg>`;
+    rotor.innerHTML = `<svg viewBox="0 0 720 720"><defs><linearGradient id="upg-arrow-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe45a"/><stop offset=".55" stop-color="#ffcf1a"/><stop offset="1" stop-color="#ffc000"/></linearGradient></defs><g transform="translate(360 151) scale(.225) rotate(12.9) translate(-358 -570)"><path d="M130 277 262 250 362 568Z" fill="#a67c10" fill-opacity=".55"/><path d="M433 205 346 232 358 570Z" fill="#a67c10" fill-opacity=".5"/><path d="M243 68 312 277 353 226 358 572 207 257 268 283Z" fill="url(#upg-arrow-gold)"/><path d="M312 277 353 226 358 572 318 330Z" fill="#f2b300"/><path d="M244 70 276 270 358 570 320 330Z" fill="#fff6ae" fill-opacity=".85"/></g></svg>`;
     stack.appendChild(rotor);
     upg.rotor = rotor;
     if (typeof ResizeObserver !== 'undefined') {
@@ -3543,6 +3542,48 @@ function upgInit() {
     }
     upg.sceneKey = null; upg.textKey = null; upg.hotKey = null; upg.glowVal = -1; upg.betC = null;
     upg.shown = upg.chance; upg.chRaf = 0;
+    upgBindSlider();
+}
+
+// Слайдер на pointer-событиях: палец ведёт ползунок напрямую, браузер ничего не перехватывает.
+function upgBindSlider() {
+    if (upg.sliderBound) return;
+    const ctl = document.querySelector('.upg-slider-control');
+    if (!ctl) return;
+    upg.sliderBound = true;
+    let pid = null, offset = 0;
+    const span = () => { const r = ctl.getBoundingClientRect(); return { left: r.left + 18, w: Math.max(1, r.width - 36) }; };
+    const valueAt = (clientX) => {
+        const { left, w } = span();
+        const p = Math.max(0, Math.min(1, (clientX + offset - left) / w));
+        return UPG_MIN_CHANCE + p * (UPG_MAX_CHANCE - UPG_MIN_CHANCE);
+    };
+    ctl.addEventListener('pointerdown', (e) => {
+        if (upg.busy || pid !== null) return;
+        pid = e.pointerId;
+        try { ctl.setPointerCapture(pid); } catch (_) {}
+        const { left, w } = span();
+        const thumbX = left + (upg.shown - UPG_MIN_CHANCE) / (UPG_MAX_CHANCE - UPG_MIN_CHANCE) * w;
+        offset = Math.abs(e.clientX - thumbX) <= 32 ? thumbX - e.clientX : 0;
+        ctl.classList.add('is-drag');
+        upgSliderInput(valueAt(e.clientX));
+        e.preventDefault();
+    });
+    ctl.addEventListener('pointermove', (e) => {
+        if (e.pointerId !== pid) return;
+        upgSliderInput(valueAt(e.clientX));
+        e.preventDefault();
+    });
+    const end = (e) => {
+        if (e.pointerId !== pid) return;
+        pid = null;
+        try { ctl.releasePointerCapture(e.pointerId); } catch (_) {}
+        ctl.classList.remove('is-drag');
+        upgSliderEnd();
+    };
+    ctl.addEventListener('pointerup', end);
+    ctl.addEventListener('pointercancel', end);
+    ctl.addEventListener('lostpointercapture', end);
 }
 
 function upgRefresh(resetResult = true) {
