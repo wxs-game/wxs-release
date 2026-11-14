@@ -57,7 +57,7 @@ window.WXS_CONFIG = Object.freeze({
     <link rel="stylesheet" href="style.css?v=8">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Orbitron:wght@700;900&display=swap&subset=cyrillic" rel="stylesheet">
 
     <style>
         .crash-countdown {
@@ -253,9 +253,9 @@ window.WXS_CONFIG = Object.freeze({
         </div>
         <div class="upg-slider-card">
             <div class="upg-slider-heading"><label for="upgChanceSlider">Шанс победы</label><output id="upgChanceValue" for="upgChanceSlider">40%</output></div>
-            <div class="upg-slider-control" style="--upg-progress:43.82%">
+            <div class="upg-slider-control" style="--upg-progress:43.82%;--upg-p:.4382">
                 <div class="upg-slider-visual" aria-hidden="true"><div class="upg-glass-rail"><i></i></div><div class="upg-liquid-thumb"></div></div>
-                <input id="upgChanceSlider" class="upg-slider" type="range" min="1" max="90" step="1" value="40" aria-label="Шанс победы" aria-valuetext="40%" oninput="upgSetChance(this.value)">
+                <input id="upgChanceSlider" class="upg-slider" type="range" min="1" max="90" step="0.01" value="40" aria-label="Шанс победы" aria-valuetext="40%" oninput="upgSliderInput(this.value)" onchange="upgSliderEnd()" onpointerup="upgSliderEnd()" onpointercancel="upgSliderEnd()" onkeydown="upgSliderKey(event)">
             </div>
         </div>
         <div id="upgResult" class="upg-result"></div>

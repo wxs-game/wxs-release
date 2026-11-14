@@ -2200,7 +2200,7 @@ function showCrashedStatic() {
     if (dom.rocketEl) dom.rocketEl.style.opacity = '0';
     if (dom.countdownEl) dom.countdownEl.style.display = 'none';
     if (dom.centerInfoEl) dom.centerInfoEl.style.opacity = '0';
-    if (dom.multEl) dom.multEl.style.color = '#e74c3c';
+    if (dom.multEl) dom.multEl.style.color = '#ff4638';
     if (dom.topLeftMult) {
         dom.topLeftMult.textContent = crashPoint.toFixed(2) + 'x';
         dom.topLeftMult.classList.add('crashed');
@@ -2587,7 +2587,7 @@ function setCrashMaxBet() {
 function crashMultColor(m) {
     if (m <= 1.25) return '#ff3b3b';   // 1.00–1.25  красный
     if (m <= 1.85) return '#ffd21f';   // 1.26–1.85  жёлтый
-    if (m <= 3.00) return '#2ecc71';   // 1.86–3.00  зелёный
+    if (m <= 3.00) return '#1fe07a';   // 1.86–3.00  зелёный
     if (m <= 5.00) return '#3da5ff';   // 3.01–5.00  синий
     return '#ffc400';                  // 5.01+      ярко-золотой
 }
@@ -2745,7 +2745,7 @@ function renderCrashUI(heavy = true) {
     if (crashGame.phase === 'crashed') {
         dom.statusEl.textContent = `Крах на ${crashShownPoint().toFixed(2)}x · Следующий раунд скоро`;
         dom.multEl.textContent = crashShownPoint().toFixed(2) + 'x';
-        dom.multEl.style.color = '#e74c3c';
+        dom.multEl.style.color = '#ff4638';
         renderCrashFreebet();
         if (dom.betInput) dom.betInput.disabled = !!crashGame.queued;
         dom.actionBtn.textContent = crashGame.queued ? 'Ставка в очереди ✓' : (crashFreebetOn ? 'Фрибет поставится в след. раунде' : 'Поставить на след. раунд');
@@ -3138,36 +3138,39 @@ const upgPt = (r, deg) => { const a = deg * Math.PI / 180; return [360 + r * Mat
 // Колесо БЕЗ красного сектора — от шанса не зависит, строится один раз.
 function upgWheel() {
     if (upg.wheel && upg.wheel.width === upg.size) return upg.wheel;
-    const S = upg.size / 720;
+    const S = upg.size / 720, TAU = Math.PI * 2;
     const c = document.createElement('canvas');
     c.width = c.height = upg.size;
     const x = c.getContext('2d');
     x.setTransform(S, 0, 0, S, 0, 0);
     const grad = (y1, y2, a, b) => { const g = x.createLinearGradient(0, y1, 0, y2); g.addColorStop(0, a); g.addColorStop(1, b); return g; };
-    const disc = (r, a, b) => { x.beginPath(); x.arc(360, 360, r, 0, Math.PI * 2); x.fillStyle = grad(360 - r, 360 + r, a, b); x.fill(); };
+    const disc = (r, a, b) => { x.beginPath(); x.arc(360, 360, r, 0, TAU); x.fillStyle = grad(360 - r, 360 + r, a, b); x.fill(); };
 
+    // мягкая тень под колесом
     x.save();
-    x.shadowColor = 'rgba(0,0,0,0.55)'; x.shadowBlur = 28 * S; x.shadowOffsetY = 16 * S;
-    x.fillStyle = '#000'; x.beginPath(); x.arc(360, 360, 277, 0, Math.PI * 2); x.fill();
+    x.shadowColor = 'rgba(0,0,0,0.6)'; x.shadowBlur = 30 * S; x.shadowOffsetY = 14 * S;
+    x.fillStyle = '#000'; x.beginPath(); x.arc(360, 360, 286, 0, TAU); x.fill();
     x.restore();
 
-    for (let i = 0; i < 72; i++) {
-        const major = i % 6 === 0;
-        const [x1, y1] = upgPt(major ? 286 : 289, i * 5);
-        const [x2, y2] = upgPt(major ? 300 : 296, i * 5);
-        x.strokeStyle = major ? '#484847' : '#343434';
-        x.lineWidth = major ? 3.5 : 2.2;
+    // внешние риски (как на макете: редкие серые штрихи вокруг диска)
+    for (let i = 0; i < 48; i++) {
+        const major = i % 4 === 0;
+        const [x1, y1] = upgPt(305, i * 7.5);
+        const [x2, y2] = upgPt(major ? 327 : 320, i * 7.5);
+        x.strokeStyle = major ? '#5b5b60' : '#46464a';
+        x.lineWidth = major ? 3.8 : 3;
         x.lineCap = 'butt';
-        x.beginPath(); x.moveTo(x1,y1); x.lineTo(x2,y2); x.stroke();
+        x.beginPath(); x.moveTo(x1, y1); x.lineTo(x2, y2); x.stroke();
     }
-    disc(279, '#353535', '#242424');
-    disc(275, '#101011', '#131314');
-    disc(270, '#242427', '#242427');
-    disc(183, '#19191b', '#19191b');
-    x.beginPath(); x.arc(360,360,183,0,Math.PI*2);
-    x.strokeStyle = '#2d2d30'; x.lineWidth = 1.8; x.stroke();
-    x.beginPath(); x.arc(360,360,282,Math.PI*.12,Math.PI*.88);
-    x.strokeStyle = 'rgba(240,72,84,.28)'; x.lineWidth=1.4; x.stroke();
+
+    disc(286, '#34343a', '#222226');          // ободок
+    disc(282, '#252529', '#202023');          // тёмный диск, где лежит сектор
+    x.beginPath(); x.arc(360, 360, 283.5, 0, TAU);
+    x.strokeStyle = '#151517'; x.lineWidth = 2; x.stroke();
+
+    disc(183, '#1c1c1f', '#18181b');          // центральный диск
+    x.beginPath(); x.arc(360, 360, 183, 0, TAU);
+    x.strokeStyle = '#303035'; x.lineWidth = 2.2; x.stroke();
 
     return (upg.wheel = c);
 }
@@ -3183,20 +3186,35 @@ function upgSectorPath(x, chance) {
 
 // Красный сектор + тонкое кольцо по внутреннему краю (рисуется поверх колеса)
 function upgPaintSector(x, chance) {
-    const half = chance * 1.8, k = Math.PI / 180;
-    const begin = (180-half)*k-Math.PI/2, end = (180+half)*k-Math.PI/2;
-    const g = x.createLinearGradient(0,360,0,640);
-    g.addColorStop(0,'#ff6970'); g.addColorStop(.5,'#f34754'); g.addColorStop(1,'#bd192d');
+    const half = chance * 1.8, k = Math.PI / 180, TAU = Math.PI * 2;
+    const begin = (180 - half) * k - Math.PI / 2, end = (180 + half) * k - Math.PI / 2;
+    const S = upg.size / 720;
+    const g = x.createLinearGradient(0, 246, 0, 632);
+    g.addColorStop(0, '#ffe41f'); g.addColorStop(.40, '#ffd80d'); g.addColorStop(.60, '#ffb613');
+    g.addColorStop(.80, '#ff8520'); g.addColorStop(1, '#ff3a22');
+    // сам сектор + жёлтое свечение
     x.save();
-    x.shadowColor='rgba(240,72,84,.48)'; x.shadowBlur=15*upg.size/720;
-    upgSectorPath(x,chance); x.fillStyle=g; x.fill();
+    x.shadowColor = 'rgba(255,198,0,.6)'; x.shadowBlur = 26 * S;
+    upgSectorPath(x, chance); x.fillStyle = g; x.fill();
     x.restore();
-    x.beginPath(); x.arc(360,360,183,0,Math.PI*2);
-    x.strokeStyle='#2d2d30'; x.lineWidth=1.6; x.stroke();
-    x.beginPath(); x.arc(360,360,274,begin,end);
-    x.strokeStyle='#ff5d64'; x.lineWidth=1.8; x.stroke();
-    x.beginPath(); x.arc(360,360,280,begin,end);
-    x.strokeStyle='rgba(240,72,84,.45)'; x.lineWidth=1; x.stroke();
+    // тень от центрального диска на сектор
+    x.save();
+    upgSectorPath(x, chance); x.clip();
+    const rg = x.createRadialGradient(360, 360, 183, 360, 360, 238);
+    rg.addColorStop(0, 'rgba(0,0,0,.55)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = rg; x.fillRect(0, 0, 720, 720);
+    x.restore();
+    // кромка центрального диска
+    x.beginPath(); x.arc(360, 360, 183, 0, TAU);
+    x.strokeStyle = '#303035'; x.lineWidth = 2; x.stroke();
+    // тонкое золотое кольцо снаружи сектора
+    const rg2 = x.createLinearGradient(0, 246, 0, 632);
+    rg2.addColorStop(0, '#ffd21f'); rg2.addColorStop(.55, '#ffb21c'); rg2.addColorStop(1, '#ff8a1a');
+    x.save();
+    x.shadowColor = 'rgba(255,165,0,.75)'; x.shadowBlur = 10 * S;
+    x.beginPath(); x.arc(360, 360, 292, begin, end);
+    x.strokeStyle = rg2; x.lineWidth = 3.6; x.lineCap = 'round'; x.stroke();
+    x.restore();
 }
 
 // Слой свечения. Центр (r < 183) вырезан, чтобы ореол не залезал на центральный диск.
@@ -3204,9 +3222,10 @@ function upgPaintHot(x, S, chance) {
     x.setTransform(S, 0, 0, S, 0, 0);
     x.save();
     x.beginPath(); x.rect(0, 0, 720, 720); x.arc(360, 360, 183, 0, Math.PI * 2, true); x.clip('evenodd');
-    x.save(); x.shadowColor = 'rgba(255,70,84,1)'; x.shadowBlur = 34 * S; x.fillStyle = '#ff4654';
+    x.save(); x.shadowColor = 'rgba(255,190,20,1)'; x.shadowBlur = 36 * S; x.fillStyle = '#ffc01a';
     upgSectorPath(x, chance); x.fill(); x.restore();
-    const g = x.createLinearGradient(0, 495, 0, 569); g.addColorStop(0, '#ff6872'); g.addColorStop(1, '#e22c3c');
+    const g = x.createLinearGradient(0, 246, 0, 632);
+    g.addColorStop(0, '#fff27a'); g.addColorStop(.4, '#ffe433'); g.addColorStop(.62, '#ffbd22'); g.addColorStop(.82, '#ff9028'); g.addColorStop(1, '#ff4a2a');
     upgSectorPath(x, chance); x.fillStyle = g; x.fill();
     x.restore();
 }
@@ -3230,15 +3249,17 @@ function upgChanceAnim() {
     let last = performance.now();
     const step = (now) => {
         upg.chRaf = 0;
-        if (upg.busy) { upg.shown = upg.chance; upgDraw(); return; }
+        if (upg.sliding) return;                       // палец ведёт слайдер сам
+        if (upg.busy) { upg.shown = upg.chance; upgPaintSlider(upg.shown); upgDraw(); return; }
         const dt = Math.min(64, now - last); last = now;
         const diff = upg.chance - upg.shown;
         if (Math.abs(diff) < 0.04) {
-            upg.shown = upg.chance; upgDraw();
+            upg.shown = upg.chance; upgPaintSlider(upg.shown); upgDraw();
             setTimeout(() => { if (!upg.busy && upg.ctx) upgHotSprite(upg.chance); }, 80);   // заранее готовим свечение
             return;
         }
         upg.shown += diff * (1 - Math.exp(-dt / 70));
+        upgPaintSlider(upg.shown);
         upgDraw();
         upg.chRaf = requestAnimationFrame(step);
     };
@@ -3495,7 +3516,7 @@ function upgInit() {
     upg.stack = stack;
     const center = document.createElement('div');
     center.className = 'upg-center';
-    center.innerHTML = `<svg class="upg-emblem" viewBox="0 0 64 52" aria-hidden="true"><path d="M9 25 32 5l23 20v12L32 17 9 37Z" fill="#ffd000"/><path d="m15 38 17-15 17 15v10L32 34 15 48Z" fill="#b57d13"/></svg><strong class="upg-center-value"></strong><span class="upg-center-coef"></span><small class="upg-center-caption"></small>`;
+    center.innerHTML = `<svg class="upg-emblem" viewBox="0 0 64 58" aria-hidden="true"><path d="M32 25 56 40V55L32 40 8 55V40Z" fill="#7f670d"/><path d="M32 0 64 20V38L32 18 0 38V20Z" fill="#ffd80d"/></svg><strong class="upg-center-value"></strong><span class="upg-center-coef"></span><small class="upg-center-caption"></small>`;
     stack.appendChild(center);
     upg.center = center;
     upg.centerValue = center.querySelector('.upg-center-value');
@@ -3504,7 +3525,7 @@ function upgInit() {
     const rotor = document.createElement('div');
     rotor.className = 'upg-rotor';
     rotor.setAttribute('aria-hidden','true');
-    rotor.innerHTML = `<svg viewBox="0 0 720 720"><defs><linearGradient id="upg-arrow-gold" x1=".3" y1="1" x2=".65" y2="0"><stop stop-color="#fff4ad"/><stop offset=".34" stop-color="#ffdf00"/><stop offset="1" stop-color="#ffd000"/></linearGradient></defs><path d="M360 160 345 91 357 46 362 94 377 81 367 102Z" fill="url(#upg-arrow-gold)"/><path d="M360 160 357 47 362 94Z" fill="#fff8d8" fill-opacity=".85"/><path d="M360 160 345 91 355 104Z" fill="#f3bb05"/></svg>`;
+    rotor.innerHTML = `<svg viewBox="0 0 720 720"><defs><linearGradient id="upg-arrow-gold" x1=".3" y1="1" x2=".65" y2="0"><stop stop-color="#fff7b8"/><stop offset=".34" stop-color="#ffe21a"/><stop offset="1" stop-color="#ffc400"/></linearGradient></defs><path d="M360 160 345 91 357 46 362 94 377 81 367 102Z" fill="url(#upg-arrow-gold)"/><path d="M360 160 357 47 362 94Z" fill="#fff8d8" fill-opacity=".85"/><path d="M360 160 345 91 355 104Z" fill="#ffb300"/></svg>`;
     stack.appendChild(rotor);
     upg.rotor = rotor;
     if (typeof ResizeObserver !== 'undefined') {
@@ -3542,7 +3563,7 @@ function upgRefresh(resetResult = true) {
     }
     if (resetResult) upgHideResultText();
     upgDraw();
-    if (upg.shown !== upg.chance) upgChanceAnim();      // сектор плавно догоняет новый шанс
+    if (upg.shown !== upg.chance && !upg.sliding) upgChanceAnim();      // сектор плавно догоняет новый шанс
 }
 
 // Плавно гасит свечение кольца и итог прошлого раунда (без резкого сброса)
@@ -3555,16 +3576,63 @@ function upgFadeOut() {
     upg.stack?.classList.remove('is-win','is-lose');
 }
 
+// Визуал слайдера (заливка + ползунок) двигаем дробным значением — без «ступенек»
+function upgPaintSlider(v) {
+    const ctl = upg.sliderCtl || (upg.sliderCtl = document.querySelector('.upg-slider-control'));
+    if (!ctl) return;
+    const p = Math.max(0, Math.min(1, (v - UPG_MIN_CHANCE) / (UPG_MAX_CHANCE - UPG_MIN_CHANCE)));
+    ctl.style.setProperty('--upg-progress', (p * 100).toFixed(3) + '%');
+    ctl.style.setProperty('--upg-p', p.toFixed(4));
+    const out = upg.sliderOut || (upg.sliderOut = document.getElementById('upgChanceValue'));
+    const txt = Math.round(v) + '%';
+    if (out && out.textContent !== txt) out.textContent = txt;
+}
+
 function upgSyncSlider() {
     const slider = document.getElementById('upgChanceSlider');
     if (!slider) return;
-    slider.value = String(upg.chance);
     slider.disabled = upg.busy;
     slider.setAttribute('aria-valuetext', `${upg.chance}%`);
-    const progress = `${(upg.chance - UPG_MIN_CHANCE) / (UPG_MAX_CHANCE - UPG_MIN_CHANCE) * 100}%`;
-    slider.closest('.upg-slider-control').style.setProperty('--upg-progress', progress);
-    document.getElementById('upgChanceValue').textContent = `${upg.chance}%`;
+    if (!upg.sliding && upg.shown === upg.chance) {
+        slider.value = String(upg.chance);
+        upgPaintSlider(upg.chance);
+    }
     document.getElementById('upgStateLabel').textContent = upg.busy ? 'ВРАЩЕНИЕ' : 'ГОТОВ К АПГРЕЙДУ';
+}
+
+// Слайдер: во время движения пальца ничего не округляем и не пересобираем —
+// ползунок и сектор идут за значением ровно, тяжёлая часть — раз в кадр.
+function upgSliderInput(v) {
+    if (upg.busy) return;
+    const raw = Math.max(UPG_MIN_CHANCE, Math.min(UPG_MAX_CHANCE, parseFloat(v)));
+    if (!isFinite(raw)) return;
+    upg.sliding = true;
+    cancelAnimationFrame(upg.chRaf); upg.chRaf = 0;
+    upgPaintSlider(raw);
+    const c = Math.round(raw);
+    if (c !== upg.chance) { upg.chance = c; upg.pendingRefresh = true; }
+    upg.shown = raw;
+    if (!upg.sliderRaf) upg.sliderRaf = requestAnimationFrame(() => {
+        upg.sliderRaf = 0;
+        if (upg.pendingRefresh) { upg.pendingRefresh = false; upgRefresh(true); } else upgDraw();
+    });
+}
+
+// Отпустили — ползунок мягко «доезжает» до целого процента
+function upgSliderEnd() {
+    if (!upg.sliding) return;
+    upg.sliding = false;
+    cancelAnimationFrame(upg.sliderRaf); upg.sliderRaf = 0;
+    upg.pendingRefresh = false;
+    if (upg.busy) return;
+    upgRefresh(true);
+}
+
+function upgSliderKey(e) {
+    const d = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1, PageDown: -5, PageUp: 5 }[e.key];
+    if (d) { e.preventDefault(); upgAdjustChance(d); }
+    else if (e.key === 'Home') { e.preventDefault(); upgSetChance(UPG_MIN_CHANCE); }
+    else if (e.key === 'End') { e.preventDefault(); upgSetChance(UPG_MAX_CHANCE); }
 }
 
 let upgResTimer = 0;
