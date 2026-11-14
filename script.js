@@ -3098,12 +3098,12 @@ const UPG_HOUSE_EDGE = 0.05;
 const UPG_MIN_CHANCE = 1;
 const UPG_MAX_CHANCE = 90;
 const UPG_STEP = 5;
-const UPG_START = -40;       // где стрелка стоит до запуска
+const UPG_START = 108;       // где стрелка стоит до запуска
 const UPG_WINDUP = 12;       // замах назад, градусы
 const UPG_T = { pause: 400, windup: 600, spin: 6000, land: 390 };   // мс, как в боте
 const UPG_FONT = '"Carlito","Helvetica Neue",Arial,sans-serif';
 
-const upg = { chance: 50, busy: false, result: null, fade: 1, theta: UPG_START, glow: 0, scenes: {}, cv: null, ctx: null, size: 0, raf: 0, fadeRaf: 0 };
+const upg = { chance: 40, busy: false, result: null, fade: 1, theta: UPG_START, glow: 0, scenes: {}, cv: null, ctx: null, size: 0, raf: 0, fadeRaf: 0 };
 
 function upgCalc(bet, chance) {
     const coef = (1 - UPG_HOUSE_EDGE) * 100 / chance;
@@ -3126,7 +3126,7 @@ function upgBet() {
 }
 
 const upgSmooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
-const upgPt = (r, deg) => { const a = deg * Math.PI / 180; return [360 + r * Math.sin(a), 315 - r * Math.cos(a)]; };
+const upgPt = (r, deg) => { const a = deg * Math.PI / 180; return [360 + r * Math.sin(a), 360 - r * Math.cos(a)]; };
 
 /* ---------- статичные слои колеса (кэшируются по шансу) ----------
    Раньше каждый кадр перерисовывал ВСЁ: 2 полноразмерные картинки с альфой,
@@ -3144,39 +3144,31 @@ function upgWheel() {
     const x = c.getContext('2d');
     x.setTransform(S, 0, 0, S, 0, 0);
     const grad = (y1, y2, a, b) => { const g = x.createLinearGradient(0, y1, 0, y2); g.addColorStop(0, a); g.addColorStop(1, b); return g; };
-    const disc = (r, a, b) => { x.beginPath(); x.arc(360, 315, r, 0, Math.PI * 2); x.fillStyle = grad(315 - r, 315 + r, a, b); x.fill(); };
+    const disc = (r, a, b) => { x.beginPath(); x.arc(360, 360, r, 0, Math.PI * 2); x.fillStyle = grad(360 - r, 360 + r, a, b); x.fill(); };
 
     x.save();
     x.shadowColor = 'rgba(0,0,0,0.55)'; x.shadowBlur = 28 * S; x.shadowOffsetY = 16 * S;
-    x.fillStyle = '#000'; x.beginPath(); x.arc(360, 315, 277, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#000'; x.beginPath(); x.arc(360, 360, 277, 0, Math.PI * 2); x.fill();
     x.restore();
 
-    for (let i = 0; i < 96; i++) {
-        const major = i % 8 === 0;
-        const [x1, y1] = upgPt(major ? 286 : 289, i * 3.75);
-        const [x2, y2] = upgPt(major ? 300 : 296, i * 3.75);
-        x.strokeStyle = major ? '#77737b' : '#39373f';
-        x.lineWidth = major ? 2.8 : 1.7;
-        x.lineCap = 'round';
+    for (let i = 0; i < 72; i++) {
+        const major = i % 6 === 0;
+        const [x1, y1] = upgPt(major ? 286 : 289, i * 5);
+        const [x2, y2] = upgPt(major ? 300 : 296, i * 5);
+        x.strokeStyle = major ? '#484847' : '#343434';
+        x.lineWidth = major ? 3.5 : 2.2;
+        x.lineCap = 'butt';
         x.beginPath(); x.moveTo(x1,y1); x.lineTo(x2,y2); x.stroke();
     }
-    disc(279, '#45414a', '#18171e');
-    disc(275, '#111116', '#27232a');
-    disc(270, '#343139', '#222127');
-    disc(190, '#1d1c22', '#111115');
-    x.beginPath(); x.arc(360,315,190,0,Math.PI*2);
-    x.strokeStyle = '#44404a'; x.lineWidth = 1.8; x.stroke();
-    x.beginPath(); x.arc(360,315,282,Math.PI*.12,Math.PI*.88);
+    disc(279, '#353535', '#242424');
+    disc(275, '#101011', '#131314');
+    disc(270, '#242427', '#242427');
+    disc(183, '#19191b', '#19191b');
+    x.beginPath(); x.arc(360,360,183,0,Math.PI*2);
+    x.strokeStyle = '#2d2d30'; x.lineWidth = 1.8; x.stroke();
+    x.beginPath(); x.arc(360,360,282,Math.PI*.12,Math.PI*.88);
     x.strokeStyle = 'rgba(240,72,84,.28)'; x.lineWidth=1.4; x.stroke();
 
-    // плашка «ставка / выигрыш»
-    x.fillStyle = '#161618';
-    x.beginPath();
-    const [px0, py0, px1, py1, rr] = [62, 619, 658, 695, 18];
-    x.moveTo(px0 + rr, py0); x.arcTo(px1, py0, px1, py1, rr); x.arcTo(px1, py1, px0, py1, rr);
-    x.arcTo(px0, py1, px0, py0, rr); x.arcTo(px0, py0, px1, py0, rr); x.closePath(); x.fill();
-    x.strokeStyle = '#323238'; x.lineWidth = 1;
-    x.beginPath(); x.moveTo(360, 633); x.lineTo(360, 681); x.stroke();
     return (upg.wheel = c);
 }
 
@@ -3184,24 +3176,34 @@ function upgWheel() {
 function upgSectorPath(x, chance) {
     const half = chance * 1.8, k = Math.PI / 180;
     x.beginPath();
-    x.arc(360, 315, 270, (180 - half) * k - Math.PI / 2, (180 + half) * k - Math.PI / 2);
-    x.arc(360, 315, 190, (180 + half) * k - Math.PI / 2, (180 - half) * k - Math.PI / 2, true);
+    x.arc(360, 360, 270, (180 - half) * k - Math.PI / 2, (180 + half) * k - Math.PI / 2);
+    x.arc(360, 360, 183, (180 + half) * k - Math.PI / 2, (180 - half) * k - Math.PI / 2, true);
     x.closePath();
 }
 
 // Красный сектор + тонкое кольцо по внутреннему краю (рисуется поверх колеса)
 function upgPaintSector(x, chance) {
-    const g = x.createLinearGradient(0, 120, 0, 590); g.addColorStop(0, '#ff6670'); g.addColorStop(.65, '#f04854'); g.addColorStop(1, '#c01c2e');
-    upgSectorPath(x, chance);
-    x.fillStyle = g; x.fill();
-    x.beginPath(); x.arc(360, 315, 190, 0, Math.PI * 2); x.strokeStyle = '#34343c'; x.lineWidth = 1.6; x.stroke();
+    const half = chance * 1.8, k = Math.PI / 180;
+    const begin = (180-half)*k-Math.PI/2, end = (180+half)*k-Math.PI/2;
+    const g = x.createLinearGradient(0,360,0,640);
+    g.addColorStop(0,'#ff6970'); g.addColorStop(.5,'#f34754'); g.addColorStop(1,'#bd192d');
+    x.save();
+    x.shadowColor='rgba(240,72,84,.48)'; x.shadowBlur=15*upg.size/720;
+    upgSectorPath(x,chance); x.fillStyle=g; x.fill();
+    x.restore();
+    x.beginPath(); x.arc(360,360,183,0,Math.PI*2);
+    x.strokeStyle='#2d2d30'; x.lineWidth=1.6; x.stroke();
+    x.beginPath(); x.arc(360,360,274,begin,end);
+    x.strokeStyle='#ff5d64'; x.lineWidth=1.8; x.stroke();
+    x.beginPath(); x.arc(360,360,280,begin,end);
+    x.strokeStyle='rgba(240,72,84,.45)'; x.lineWidth=1; x.stroke();
 }
 
-// Слой свечения. Центр (r < 180) вырезан, чтобы ореол не залезал на центральный диск.
+// Слой свечения. Центр (r < 183) вырезан, чтобы ореол не залезал на центральный диск.
 function upgPaintHot(x, S, chance) {
     x.setTransform(S, 0, 0, S, 0, 0);
     x.save();
-    x.beginPath(); x.rect(0, 0, 720, 720); x.arc(360, 315, 190, 0, Math.PI * 2, true); x.clip('evenodd');
+    x.beginPath(); x.rect(0, 0, 720, 720); x.arc(360, 360, 183, 0, Math.PI * 2, true); x.clip('evenodd');
     x.save(); x.shadowColor = 'rgba(255,70,84,1)'; x.shadowBlur = 34 * S; x.fillStyle = '#ff4654';
     upgSectorPath(x, chance); x.fill(); x.restore();
     const g = x.createLinearGradient(0, 495, 0, 569); g.addColorStop(0, '#ff6872'); g.addColorStop(1, '#e22c3c');
@@ -3318,23 +3320,15 @@ function upgDraw() {
     const tKey = disp + '|' + chance + '|' + bet + '|' + (upg.result || '') + '|' + (upg.result ? Math.round(upg.fade * 200) : 0) + '|' + upg.size + '|' + upgraderFreebetOn + '|' + upg.resultPayout;
     if (upg.textKey !== tKey) {
         upg.textKey = tKey;
-        const x = upg.txCtx;
         const gross = upgCalc(bet, chance).payout;
         const payout = upg.result && Number.isFinite(upg.resultPayout)
             ? upg.resultPayout : (upgraderFreebetOn ? roundMoney(gross - bet) : gross);
-        x.setTransform(1, 0, 0, 1, 0, 0);
-        x.clearRect(0, 0, upg.size, upg.size);
-        x.setTransform(S, 0, 0, S, 0, 0);
         const outcome = upg.result;
         upg.centerValue.textContent = outcome === 'win' ? 'ПОБЕДА' : outcome === 'lose' ? 'МИМО' : `${disp}%`;
         upg.centerCoef.textContent = outcome === 'win' ? `+${payout.toFixed(2)} $` : `x${upgCalc(bet, chance).coef.toFixed(2)}`;
         upg.centerCaption.textContent = outcome === 'win' ? 'ЗАЧИСЛЕНО НА БАЛАНС' : outcome === 'lose' ? 'ПОПРОБУЙ ЕЩЁ' : 'ШАНС ПОБЕДЫ';
         upg.center.classList.toggle('is-result', !!outcome);
         upg.center.classList.toggle('is-win', outcome === 'win');
-        upgSpaced(x, 'СТАВКА', 211, 639, 13, '#8c8c96', 1);
-        upgSpaced(x, 'ВЫИГРЫШ', 509, 639, 13, '#8c8c96', 1);
-        upgFit(x, `${bet.toFixed(2)} $`, 211, 667, 28, 258, '#ffffff');
-        upgFit(x, `${payout.toFixed(2)} $`, 509, 667, 28, 258, '#ffd61e');
     }
 
     if (!upg.spinAnimation) upgSetRotorAngle(upg.theta);
@@ -3498,7 +3492,6 @@ function upgInit() {
         return c;
     };
     upg.hotCv = mk('hot'); upg.hotCv.style.opacity = '0'; upg.hotCtx = upg.hotCv.getContext('2d');
-    upg.txCv = mk('text');  upg.txCtx = upg.txCv.getContext('2d');
     upg.stack = stack;
     const center = document.createElement('div');
     center.className = 'upg-center';
@@ -3511,7 +3504,7 @@ function upgInit() {
     const rotor = document.createElement('div');
     rotor.className = 'upg-rotor';
     rotor.setAttribute('aria-hidden','true');
-    rotor.innerHTML = `<svg viewBox="0 0 720 720"><defs><linearGradient id="upg-arrow-gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff6b6"/><stop offset=".38" stop-color="#ffd000"/><stop offset="1" stop-color="#d9910c"/></linearGradient><linearGradient id="upg-arrow-tail"><stop stop-color="#ffd000" stop-opacity="0"/><stop offset="1" stop-color="#ffd000" stop-opacity=".65"/></linearGradient></defs><path d="M202 88A277 277 0 0 1 337 39" stroke="url(#upg-arrow-tail)" stroke-width="2" fill="none"/><path d="m360 23-17 65 17-18 14 14Z" fill="url(#upg-arrow-gold)" stroke="#302613" stroke-width="1.5"/><path d="m360 27 0 38-11 14Z" fill="#fff6cc" fill-opacity=".75"/></svg>`;
+    rotor.innerHTML = `<svg viewBox="0 0 720 720"><defs><linearGradient id="upg-arrow-gold" x1=".3" y1="1" x2=".65" y2="0"><stop stop-color="#fff4ad"/><stop offset=".34" stop-color="#ffdf00"/><stop offset="1" stop-color="#ffd000"/></linearGradient></defs><path d="M360 160 345 91 357 46 362 94 377 81 367 102Z" fill="url(#upg-arrow-gold)"/><path d="M360 160 357 47 362 94Z" fill="#fff8d8" fill-opacity=".85"/><path d="M360 160 345 91 355 104Z" fill="#f3bb05"/></svg>`;
     stack.appendChild(rotor);
     upg.rotor = rotor;
     if (typeof ResizeObserver !== 'undefined') {
@@ -3520,7 +3513,7 @@ function upgInit() {
             const size = Math.round(Math.max(240, Math.min(420,width)) * Math.min(window.devicePixelRatio || 1,2));
             if (!width || size === upg.size) return;
             upg.size = size;
-            for (const layer of [upg.cv, upg.hotCv, upg.txCv]) layer.width = layer.height = size;
+            for (const layer of [upg.cv, upg.hotCv]) layer.width = layer.height = size;
             upg.wheel = null; upg.scenes = {};
             upg.sceneKey = upg.textKey = upg.hotKey = null;
             upgDraw();
@@ -3568,7 +3561,8 @@ function upgSyncSlider() {
     slider.value = String(upg.chance);
     slider.disabled = upg.busy;
     slider.setAttribute('aria-valuetext', `${upg.chance}%`);
-    slider.style.setProperty('--upg-progress', `${(upg.chance - UPG_MIN_CHANCE) / (UPG_MAX_CHANCE - UPG_MIN_CHANCE) * 100}%`);
+    const progress = `${(upg.chance - UPG_MIN_CHANCE) / (UPG_MAX_CHANCE - UPG_MIN_CHANCE) * 100}%`;
+    slider.closest('.upg-slider-control').style.setProperty('--upg-progress', progress);
     document.getElementById('upgChanceValue').textContent = `${upg.chance}%`;
     document.getElementById('upgStateLabel').textContent = upg.busy ? 'ВРАЩЕНИЕ' : 'ГОТОВ К АПГРЕЙДУ';
 }

@@ -54,7 +54,7 @@ window.WXS_CONFIG = Object.freeze({
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=8">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
@@ -247,12 +247,16 @@ window.WXS_CONFIG = Object.freeze({
     </div>
 
     <section class="wheel-card upg-card">
-        <div class="upg-stage-heading"><span class="upg-live-dot" aria-hidden="true"></span><span id="upgStateLabel">ГОТОВ К АПГРЕЙДУ</span><span class="upg-stage-mark">WXS / UP</span></div>
-        <canvas id="upgCanvas" class="upg-canvas" aria-label="Колесо апгрейдера"></canvas>
+        <div class="upg-wheel-frame">
+            <div class="upg-stage-heading"><span class="upg-live-dot" aria-hidden="true"></span><span id="upgStateLabel">ГОТОВ К АПГРЕЙДУ</span></div>
+            <canvas id="upgCanvas" class="upg-canvas" aria-label="Колесо апгрейдера"></canvas>
+        </div>
         <div class="upg-slider-card">
-            <div class="upg-slider-heading"><label for="upgChanceSlider">Шанс победы</label><output id="upgChanceValue" for="upgChanceSlider">50%</output></div>
-            <input id="upgChanceSlider" class="upg-slider" type="range" min="1" max="90" step="1" value="50" aria-label="Шанс победы" aria-valuetext="50%" oninput="upgSetChance(this.value)">
-            <div class="upg-slider-limits" aria-hidden="true"><span>1%</span><span>90%</span></div>
+            <div class="upg-slider-heading"><label for="upgChanceSlider">Шанс победы</label><output id="upgChanceValue" for="upgChanceSlider">40%</output></div>
+            <div class="upg-slider-control" style="--upg-progress:43.82%">
+                <div class="upg-slider-visual" aria-hidden="true"><div class="upg-glass-rail"><i></i></div><div class="upg-liquid-thumb"></div></div>
+                <input id="upgChanceSlider" class="upg-slider" type="range" min="1" max="90" step="1" value="40" aria-label="Шанс победы" aria-valuetext="40%" oninput="upgSetChance(this.value)">
+            </div>
         </div>
         <div id="upgResult" class="upg-result"></div>
         <div id="upgInfo" class="upg-info"></div>
@@ -274,7 +278,7 @@ window.WXS_CONFIG = Object.freeze({
             <div class="mines-bet-header" style="margin-top: 16px;">
                 <label>ШАНС ПОБЕДЫ</label>
                 <div class="card-input-wrap">
-                    <input type="number" id="upgChanceInput" value="50" min="1" max="90" step="1" inputmode="numeric" oninput="upgOnChanceInput(false)" onblur="upgOnChanceInput(true)" onkeydown="blockInvalidBetKeys(event)">
+                    <input type="number" id="upgChanceInput" value="40" min="1" max="90" step="1" inputmode="numeric" oninput="upgOnChanceInput(false)" onblur="upgOnChanceInput(true)" onkeydown="blockInvalidBetKeys(event)">
                     <span class="currency-symbol">%</span>
                 </div>
             </div>
@@ -414,7 +418,7 @@ window.WXS_CONFIG = Object.freeze({
 </div>
 
 <!-- Анимации ракеты и взрыва -->
-<script src="script.js?v=7"></script>
+<script src="script.js?v=8"></script>
 </body>
 </html>
 
