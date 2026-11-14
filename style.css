@@ -5226,6 +5226,101 @@ html[data-route="upgrader"] .fairness-overlay { display: none; }
     pointer-events: none;
 }
 
+/* Upgrader: graphite dial, red probability sector and a compositor-driven gold pointer. */
+#upgraderPage .upg-card {
+    position: relative;
+    background: radial-gradient(ellipse at 50% 12%, rgba(240,72,84,.065), transparent 60%), #0d0c10;
+    border-color: #29252c;
+    box-shadow: 0 18px 44px rgba(0,0,0,.25), inset 0 1px rgba(255,255,255,.04);
+    animation: upgEnter .4s ease both;
+}
+.upg-stage-heading {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 4px 0;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    color: #9a929e;
+}
+.upg-live-dot { width: 5px; height: 5px; border-radius: 50%; background: #f04854; box-shadow: 0 0 9px #f0485470; }
+.upg-stage-mark { margin-left: auto; color: #5d5663; letter-spacing: 1.4px; }
+.upg-stack { isolation: isolate; }
+.upg-center {
+    position: absolute;
+    left: 50%;
+    top: 43.75%;
+    transform: translate(-50%,-50%);
+    width: 46%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+.upg-emblem { display: block; width: 31%; height: auto; margin-bottom: 6px; }
+.upg-center-value { font-size: clamp(28px, 9.8vw, 43px); line-height: 1.05; font-weight: 950; letter-spacing: -1.8px; color: #fff; }
+.upg-center-coef { margin-top: 5px; font-size: clamp(15px,4.5vw,21px); line-height: 1.2; font-weight: 900; color: #ffd000; }
+.upg-center-caption { margin-top: 12px; font-size: clamp(7px,1.9vw,9px); letter-spacing: 1.35px; color: #8c8493; font-weight: 800; }
+.upg-center.is-result .upg-center-value { font-size: clamp(23px,7vw,31px); letter-spacing: -.7px; }
+.upg-center.is-win .upg-center-value { color: #6eeb8c; }
+.upg-rotor {
+    position: absolute;
+    inset: 0;
+    transform-origin: 50% 43.75%;
+    pointer-events: none;
+    backface-visibility: hidden;
+}
+.upg-rotor svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.upg-stack.is-spinning .upg-rotor { will-change: transform; }
+.upg-stack .upg-layer-hot { transition: opacity .45s ease; }
+.upg-stack.is-spinning .upg-center { animation: upgCenterBreathe 1.6s ease-in-out infinite; }
+.upg-stack.is-win .upg-emblem { animation: upgEmblemWin .5s ease both; }
+.upg-slider-card {
+    border: 1px solid #32272d;
+    border-radius: 16px;
+    padding: 12px 14px 9px;
+    background: linear-gradient(140deg, rgba(240,72,84,.055), rgba(255,255,255,.018));
+    box-shadow: inset 0 1px rgba(255,255,255,.035);
+}
+.upg-slider-heading { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: #a49aa9; }
+.upg-slider-heading output { color: #ff6570; font-size: 13px; font-weight: 900; font-variant-numeric: tabular-nums; }
+#upgraderPage .upg-slider {
+    --upg-progress: 55.056%;
+    display: block;
+    width: 100%;
+    height: 42px;
+    margin: 0;
+    padding: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    cursor: pointer;
+    touch-action: pan-y;
+}
+.upg-slider::-webkit-slider-runnable-track { height: 8px; border-radius: 99px; background: linear-gradient(90deg, #f04854 var(--upg-progress), #2c252e var(--upg-progress)); box-shadow: inset 0 1px 2px #0006; }
+.upg-slider::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 26px; height: 26px; margin-top: -9px; border: 3px solid #21171c; border-radius: 50%; background: linear-gradient(145deg,#ff9197,#f04854 58%,#c01c2e); box-shadow: 0 0 0 1px #f0485460,0 2px 8px #0008; transition: box-shadow .15s ease; }
+.upg-slider:active::-webkit-slider-thumb { box-shadow: 0 0 0 5px #f0485426,0 2px 8px #0008; }
+.upg-slider::-moz-range-track { height: 8px; border-radius: 99px; background: #2c252e; }
+.upg-slider::-moz-range-progress { height: 8px; border-radius: 99px; background: #f04854; }
+.upg-slider::-moz-range-thumb { width: 20px; height: 20px; border: 3px solid #21171c; border-radius: 50%; background: #f04854; box-shadow: 0 0 0 1px #f0485460; }
+.upg-slider:focus-visible { outline: 1px solid #ff6570; outline-offset: 3px; border-radius: 9px; }
+.upg-slider:disabled { opacity: .4; cursor: wait; }
+.upg-slider-limits { display: flex; justify-content: space-between; margin-top: -2px; color: #706673; font-size: 9px; }
+#upgraderPage .upg-result { transition: opacity .2s ease; }
+#upgraderPage .upg-result.win { animation: upgResultReveal .35s ease both; }
+@keyframes upgEnter { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes upgCenterBreathe { 0%,100% { opacity: 1; } 50% { opacity: .75; } }
+@keyframes upgEmblemWin { from { transform: translateY(4px) scale(.9); } to { transform: translateY(0) scale(1); } }
+@keyframes upgResultReveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+    #upgraderPage .upg-card, .upg-stack.is-spinning .upg-center,
+    .upg-stack.is-win .upg-emblem, #upgraderPage .upg-result.win { animation: none; }
+    .upg-stack .upg-layer-hot { transition: none; }
+}
+
 /* Player tiles: the header's warm glass, with a lighter transparent body.
    One pressed row gets a backdrop lens; idle/scrolling lists have no filters. */
 #crashPage .crash-players-box {
