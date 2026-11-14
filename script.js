@@ -2474,6 +2474,9 @@ async function cashOutCrash() {
     }
     const mult = isFinite(Number(srv.mult)) ? Number(srv.mult) : seenMult;
     const winAmount = roundMoney(srv.win);
+    const isFreebet = srv.freebet === true;
+    // crash_bets stores the gross payout; keep the lobby consistent with reloads.
+    const grossWinAmount = isFreebet ? roundMoney(srv.gross_win) : winAmount;
 
     currentTotalWin = roundMoney(currentTotalWin + winAmount);
     currentWinsCount++;
@@ -2486,17 +2489,17 @@ async function cashOutCrash() {
     }
     crashGame.cashedOut = true;
     crashGame.cashoutMult = mult;
-    crashGame.cashoutWin = winAmount;
+    crashGame.cashoutWin = grossWinAmount;
     crashGame.cashoutRoundId = crashGame.roundId;
     crashGame.liveBetResolved = true;
     crashGame.isProcessing = false;
 
     if (window.tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
-    window.showWinPopup?.(winAmount, mult);
+    window.showWinPopup?.(winAmount, mult, isFreebet);
 
     // Сразу показываем свой кэшаут в списке игроков
     crashLobby.bets = crashLobby.bets.map(b => b.isUser
-        ? { ...b, status: 'cashed_out', cashoutMult: mult, winAmount }
+        ? { ...b, status: 'cashed_out', cashoutMult: mult, winAmount: grossWinAmount }
         : b);
     renderCrashPlayersList();
     renderCrashUI();
@@ -2837,13 +2840,14 @@ function renderCrashUI(heavy = true) {
         textEl = root.querySelector('.win-popup-text');
         barEl = root.querySelector('.win-popup-bar i');
     }
-    window.showWinPopup = function (amount, mult) {
+    window.showWinPopup = function (amount, mult, isFreebet = false) {
         const win = Number(amount);
         if (!(win > 0)) return;
         build();
-        let text = 'Выигрыш +' + win.toFixed(2).replace('.', ',') + '$';
+        let text = (isFreebet ? 'Фрибет: зачислено +' : 'Выигрыш +') + win.toFixed(2).replace('.', ',') + '$';
         const m = Number(mult);
         if (isFinite(m) && m > 0) text += ' (x' + String(parseFloat(m.toFixed(2))) + ')';
+        if (isFreebet) text += ' · номинал фрибета не возвращается';
         textEl.textContent = text;
         clearTimeout(hideTimer);
         root.classList.remove('show');
