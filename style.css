@@ -5612,3 +5612,85 @@ html[data-route="upgrader"] .fairness-overlay { display: none; }
 .upg-stack .upg-layer-lose { opacity: 0; transition: opacity .7s ease; }
 .upg-stack.is-lose .upg-layer-lose { opacity: 1; transition-duration: .5s; }
 @media (prefers-reduced-motion: reduce) { .upg-stack .upg-layer-lose { transition: none; } }
+
+
+
+
+/* =====================================================
+   LIQUID GLASS 2.0 — живое преломление при нажатии (вся игра)
+===================================================== */
+.lg-press-lens {
+    position: fixed;
+    z-index: 2147483000;
+    pointer-events: none;
+    box-sizing: border-box;
+    opacity: 0;
+    will-change: transform, opacity;
+    border: 1px solid rgba(255,255,255,.55);
+    background:
+        radial-gradient(ellipse 70% 45% at 28% 6%, rgba(255,255,255,.38), transparent 62%),
+        radial-gradient(ellipse 60% 40% at 80% 104%, rgba(255,214,150,.22), transparent 60%),
+        linear-gradient(160deg, rgba(255,255,255,.12), rgba(255,255,255,.02) 50%, rgba(255,255,255,.08));
+    box-shadow:
+        0 10px 26px rgba(0,0,0,.45),
+        inset 0 1.5px 1px rgba(255,255,255,.75),
+        inset 0 -2px 3px rgba(255,255,255,.18),
+        inset 0 0 14px rgba(255,255,255,.14);
+    -webkit-backdrop-filter: blur(1.2px) brightness(1.16) saturate(1.5);
+    backdrop-filter: blur(1.2px) brightness(1.16) saturate(1.5);
+}
+/* Настоящее преломление: линза с картой смещения (где браузер умеет SVG в backdrop-filter) */
+@supports (backdrop-filter: url("#glass-press")) {
+    .lg-press-lens.lg-svg {
+        -webkit-backdrop-filter: url("#glass-press") brightness(1.1) saturate(1.4);
+        backdrop-filter: url("#glass-press") brightness(1.1) saturate(1.4);
+    }
+}
+@media (prefers-reduced-transparency: reduce) {
+    .lg-press-lens { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: rgba(255,255,255,.12); }
+}
+
+/* Стеклянные кнопки краша/апгрейдера: при нажатии — сильнее линза и «упругий» отклик */
+:is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link):not(:disabled):active {
+    border-color: rgba(255,255,255,.5);
+    box-shadow: 0 2px 8px rgba(0,0,0,.4),
+        inset 0 2px 2px rgba(255,255,255,.65),
+        inset 0 -2px 4px rgba(255,255,255,.16),
+        inset 0 0 18px rgba(255,255,255,.12);
+    -webkit-backdrop-filter: blur(1.5px) saturate(1.5) brightness(1.12);
+    backdrop-filter: blur(1.5px) saturate(1.5) brightness(1.12);
+}
+@supports (backdrop-filter: url("#glass-press-soft")) {
+    :is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link):not(:disabled):active {
+        backdrop-filter: url("#glass-press-soft") saturate(1.4) brightness(1.1);
+    }
+}
+
+/* Ползунок шанса: пока тянем — стекло настоящее, с преломлением */
+.upg-slider-control.is-drag .upg-liquid-thumb {
+    -webkit-backdrop-filter: blur(1px) saturate(1.7) brightness(1.15);
+    backdrop-filter: blur(1px) saturate(1.7) brightness(1.15);
+    box-shadow: 0 6px 16px #000a, 0 0 14px rgba(255,255,255,.28), inset 0 2px 2px #fffe, inset 0 -2px 4px #ffffff40;
+}
+@supports (backdrop-filter: url("#glass-press")) {
+    .upg-slider-control.is-drag .upg-liquid-thumb {
+        backdrop-filter: url("#glass-press") saturate(1.5) brightness(1.1);
+    }
+}
+
+/* Строка «Коэффициент … · при победе …» удалена; пустую плашку не показываем */
+.upg-info:empty { display: none; }
+
+/* =====================================================
+   Рамка вокруг кольца апгрейдера — как у ракетки
+===================================================== */
+.upg-wheel-frame {
+    position: relative;
+    margin: 16px 0;
+    padding: 10px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(180deg, #10131a 0%, #05060a 100%);
+    box-shadow: none;
+    overflow: hidden;
+}
