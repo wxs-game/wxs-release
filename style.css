@@ -5101,7 +5101,7 @@ header.top .balance-info #topBalance {
 
 
 /* Crash liquid glass: translucent tint and a small, precomputed lens map. */
-:is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link) {
+:is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link) {
     --glass-tint: rgba(37, 30, 22, .34);
     position: relative;
     isolation: isolate;
@@ -5118,7 +5118,7 @@ header.top .balance-info #topBalance {
         box-shadow .16s ease, border-color .16s ease;
 }
 /* Rim highlights stay separate from the refracted backdrop and readable text. */
-:is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link)::before {
+:is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link)::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -5131,6 +5131,9 @@ header.top .balance-info #topBalance {
     transition: transform .16s ease, opacity .16s ease;
 }
 #crashPage #crashActionBtn,
+#upgraderPage #upgPlayBtn,
+#upgraderPage #upgFreebetBtn.on,
+#upgraderPage .pct-btn.active,
 #crashPage .crash-fb-btn.on,
 #crashFairnessModal .fairness-verify-link {
     --glass-tint: rgba(171, 104, 14, .42);
@@ -5140,44 +5143,44 @@ header.top .balance-info #topBalance {
 #crashPage .crash-fb-btn { border-style: solid; color: #ffdb8a; }
 #crashPage .crash-fairness-trigger { position: absolute; }
 #crashFairnessModal .copy-btn { border-radius: 9px; min-width: 32px; min-height: 32px; }
-:is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link):focus-visible {
+:is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link):focus-visible {
     outline: 2px solid #ffdb8a;
     outline-offset: 3px;
 }
-:is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link):not(:disabled):active {
+:is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link):not(:disabled):active {
     transform: translateY(2px) scale(.965);
     box-shadow: 0 1px 3px rgba(0,0,0,.28),
         inset 0 2px 5px rgba(0,0,0,.42), inset 0 -1px 1px rgba(255,255,255,.2);
     border-color: rgba(255, 222, 170, .65);
 }
-:is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link):not(:disabled):active::before {
+:is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link):not(:disabled):active::before {
     transform: scale(.98) translateY(1px);
     opacity: .65;
 }
-:is(#crashPage, #crashFairnessModal) button:disabled {
+:is(#crashPage, #crashFairnessModal, #upgraderPage) button:disabled {
     opacity: .45;
     cursor: default;
     transform: none;
 }
 @media (prefers-reduced-motion: reduce) {
-    :is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link),
-    :is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link)::before {
+    :is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link),
+    :is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link)::before {
         transition: none;
     }
-    :is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link):not(:disabled):active,
-    :is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link):not(:disabled):active::before {
+    :is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link):not(:disabled):active,
+    :is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link):not(:disabled):active::before {
         transform: none;
     }
 }
 
 /* Small, static surfaces only. Browsers without SVG backdrop support keep blur.
    No feTurbulence, animated filter parameters, or full-screen backdrop effects. */
-:is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link) {
+:is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link) {
     -webkit-backdrop-filter: blur(2px) saturate(1.12);
     backdrop-filter: blur(2px) saturate(1.12);
 }
 @supports (backdrop-filter: url("#crash-glass-refraction")) {
-    :is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link) {
+    :is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link) {
         backdrop-filter: url("#crash-glass-refraction") saturate(1.12);
     }
 }
@@ -5196,9 +5199,29 @@ header.top .balance-info #topBalance {
     }
 }
 @media (prefers-reduced-transparency: reduce) {
-    :is(#crashPage, #crashFairnessModal) :is(button, .fairness-verify-link) {
+    :is(#crashPage, #crashFairnessModal, #upgraderPage) :is(button, .fairness-verify-link) {
         --glass-tint: #241e17;
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
     }
+}
+
+
+/* Each standalone URL renders only its own game. */
+html[data-route="upgrader"] #crashPage,
+html[data-route="crash"] #upgraderPage { display: none !important; }
+#upgraderPage input { font-size: 16px; }
+#upgFreebetBtn[hidden] { display: none !important; }
+html[data-route="upgrader"] .fairness-overlay { display: none; }
+
+/* Draw the glass rim inside each button without changing the original dimensions. */
+#upgraderPage :is(button, .fairness-verify-link) { border-width: 0; }
+#upgraderPage button::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid;
+    border-color: inherit;
+    border-radius: inherit;
+    pointer-events: none;
 }

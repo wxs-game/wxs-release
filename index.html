@@ -8,11 +8,12 @@
 -->
 <head>
     <base href="/wxs-release/">
+    <script src="app-config.js?v=1"></script>
     <!-- РОУТЕР: адрес вида /wxs-release/<режим>. Без известного режима страница пустая и ничего не грузит. -->
     <script>
     (function () {
-        var KNOWN = { crash: true };   // сюда добавлять новые режимы: mines, upgrader ...
-        var BOTS = { crash: '@wxscrash_bot' };   // бот каждого режима (для текста «откройте через бота»)
+        var KNOWN = window.WXS_CONFIG.apps;   // сюда добавлять новые режимы: mines, upgrader ...
+        var BOTS = Object.fromEntries(Object.entries(KNOWN).map(([key, app]) => [key, app.bot]));   // бот каждого режима (для текста «откройте через бота»)
         var route = location.pathname.replace(/^\/wxs-release/i, '').replace(/^\/+|\/+$/g, '').toLowerCase();
         if (!route) { try { route = (new URLSearchParams(location.search).get('app') || '').toLowerCase(); } catch (e) {} }
         // Mini App открыт ссылкой t.me/<бот>?startapp=<режим>: Telegram кладёт параметр в hash (tgWebAppStartParam)
@@ -26,6 +27,7 @@
             return;
         }
         window.WXS_BOT = BOTS[window.WXS_ROUTE] || '';
+        document.title = KNOWN[window.WXS_ROUTE].title;
         document.documentElement.setAttribute('data-route', window.WXS_ROUTE);
     })();
     </script>
@@ -36,13 +38,13 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Ракетка</title>
+    <title>WXS</title>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
     <link rel="stylesheet" href="player-glass.css?v=1">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -227,6 +229,57 @@
         </div>
     </header>
 
+<main id="upgraderPage" class="upgrader-page hidden">
+    <div class="page-header" style="margin-top: 10px;">
+        <div class="header-space" aria-hidden="true"></div>
+
+        <h1>Апгрейдер</h1>
+        <div class="header-space"></div>
+    </div>
+
+    <section class="wheel-card upg-card">
+        <canvas id="upgCanvas" class="upg-canvas" aria-label="Колесо апгрейдера"></canvas>
+        <div id="upgResult" class="upg-result"></div>
+        <div id="upgInfo" class="upg-info"></div>
+
+        <div class="upg-panel">
+            <div class="mines-bet-header">
+                <label>СУММА СТАВКИ</label>
+                <div class="card-input-wrap">
+                    <input type="number" id="upgBetInput" placeholder="0.10" min="0.1" step="any" inputmode="decimal" oninput="upgOnBetInput()" onblur="clampBetInputOnBlur(event); upgOnBetInput()" onkeydown="blockInvalidBetKeys(event)">
+                    <span class="currency-symbol">$</span>
+                </div>
+            </div>
+            <div class="ctrl-btns-row" style="margin-top: 10px;">
+                <button class="pct-btn" onclick="upgBetFactor(0.5)">½</button>
+                <button class="pct-btn" onclick="upgBetFactor(2)">x2</button>
+                <button class="pct-btn" onclick="upgBetMax()">MAX</button>
+            </div>
+
+            <div class="mines-bet-header" style="margin-top: 16px;">
+                <label>ШАНС ПОБЕДЫ</label>
+                <div class="card-input-wrap">
+                    <input type="number" id="upgChanceInput" value="50" min="1" max="90" step="1" inputmode="numeric" oninput="upgOnChanceInput(false)" onblur="upgOnChanceInput(true)" onkeydown="blockInvalidBetKeys(event)">
+                    <span class="currency-symbol">%</span>
+                </div>
+            </div>
+            <div class="upg-chance-row">
+                <button class="pct-btn" data-chance="10" onclick="upgSetChance(10)">10%</button>
+                <button class="pct-btn" data-chance="25" onclick="upgSetChance(25)">25%</button>
+                <button class="pct-btn" data-chance="50" onclick="upgSetChance(50)">50%</button>
+                <button class="pct-btn" data-chance="75" onclick="upgSetChance(75)">75%</button>
+                <button class="pct-btn" data-chance="90" onclick="upgSetChance(90)">90%</button>
+            </div>
+            <div class="ctrl-btns-row" style="margin-top: 6px; grid-template-columns: 1fr 1fr;">
+                <button class="pct-btn" onclick="upgAdjustChance(-5)">−5%</button>
+                <button class="pct-btn" onclick="upgAdjustChance(5)">+5%</button>
+            </div>
+
+            <button id="upgFreebetBtn" class="crash-fb-btn" onclick="toggleUpgraderFreebet()" hidden></button>
+            <button class="mines-main-btn" id="upgPlayBtn" onclick="playUpgrader()" style="margin-top: 14px; width: 100%;">ИГРАТЬ</button>
+        </div>
+    </section>
+</main>
     <!-- ==================== КРАШ ==================== -->
     <main id="crashPage" class="crash-page">
         <section class="wheel-card">
@@ -362,7 +415,8 @@
 <script src="animations/crash/explosion-data-part6.js"></script>
 <script src="animations/crash/explosion-data-part7.js"></script>
 <script src="animations/crash/explosion-data-part8.js"></script>
-<script src="script.js?v=4"></script>
+<script src="script.js?v=5"></script>
 <script src="player-glass.js?v=1"></script>
 </body>
 </html>
+
