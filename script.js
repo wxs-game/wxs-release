@@ -3185,15 +3185,20 @@ function upgSectorPath(x, chance) {
 }
 
 // Красный сектор + тонкое кольцо по внутреннему краю (рисуется поверх колеса)
-function upgPaintSector(x, chance, fast) {
+function upgPaintSector(x, chance, fast, lose) {
     const half = chance * 1.8, k = Math.PI / 180, TAU = Math.PI * 2;
     const begin = (180 - half) * k - Math.PI / 2, end = (180 + half) * k - Math.PI / 2;
     const S = upg.size / 720;
     const g = x.createLinearGradient(0, 246, 0, 632);
-    g.addColorStop(0, '#ffe41f'); g.addColorStop(.40, '#ffd80d'); g.addColorStop(.60, '#ffb613');
-    g.addColorStop(.80, '#ff8520'); g.addColorStop(1, '#ff3a22');
+    if (lose) {
+        g.addColorStop(0, '#8f8789'); g.addColorStop(.40, '#9a8184'); g.addColorStop(.62, '#a9575c');
+        g.addColorStop(.82, '#b93a41'); g.addColorStop(1, '#c4252d');
+    } else {
+        g.addColorStop(0, '#ffe41f'); g.addColorStop(.40, '#ffd80d'); g.addColorStop(.60, '#ffb613');
+        g.addColorStop(.80, '#ff8520'); g.addColorStop(1, '#ff3a22');
+    }
     x.save();
-    if (!fast) { x.shadowColor = 'rgba(255,198,0,.55)'; x.shadowBlur = 24 * S; }
+    if (!fast) { x.shadowColor = lose ? 'rgba(210,50,60,.4)' : 'rgba(255,198,0,.55)'; x.shadowBlur = 24 * S; }
     upgSectorPath(x, chance); x.fillStyle = g; x.fill();
     x.restore();
     // тёмное гало от центрального диска
@@ -3207,12 +3212,26 @@ function upgPaintSector(x, chance, fast) {
     x.strokeStyle = '#2c2c31'; x.lineWidth = 2; x.stroke();
     // тонкое золотое кольцо на ободке
     const rg2 = x.createLinearGradient(0, 246, 0, 632);
-    rg2.addColorStop(0, '#ffd21f'); rg2.addColorStop(.55, '#ffb21c'); rg2.addColorStop(1, '#ff8a1a');
+    if (lose) { rg2.addColorStop(0, '#a29a9c'); rg2.addColorStop(.55, '#b8484e'); rg2.addColorStop(1, '#c8323a'); }
+    else { rg2.addColorStop(0, '#ffd21f'); rg2.addColorStop(.55, '#ffb21c'); rg2.addColorStop(1, '#ff8a1a'); }
     x.save();
-    if (!fast) { x.shadowColor = 'rgba(255,165,0,.6)'; x.shadowBlur = 8 * S; }
+    if (!fast) { x.shadowColor = lose ? 'rgba(200,50,58,.5)' : 'rgba(255,165,0,.6)'; x.shadowBlur = 8 * S; }
     x.beginPath(); x.arc(360, 360, 284.5, begin, end);
     x.strokeStyle = rg2; x.lineWidth = 3.6; x.lineCap = 'round'; x.stroke();
     x.restore();
+}
+
+// Слой проигрыша: то же колесо, но сектор красно-серый. Проявляется через css-opacity.
+function upgPaintLose(chance) {
+    const h = upg.loseCtx;
+    if (!h) return;
+    const S = upg.size / 720;
+    h.setTransform(1, 0, 0, 1, 0, 0);
+    h.clearRect(0, 0, upg.size, upg.size);
+    h.drawImage(upgWheel(), 0, 0);
+    h.setTransform(S, 0, 0, S, 0, 0);
+    upgPaintSector(h, chance, false, true);
+    upg.loseChance = chance;
 }
 
 // Слой свечения. Центр (r < 183) вырезан, чтобы ореол не залезал на центральный диск.
@@ -3220,11 +3239,19 @@ function upgPaintHot(x, S, chance) {
     x.setTransform(S, 0, 0, S, 0, 0);
     x.save();
     x.beginPath(); x.rect(0, 0, 720, 720); x.arc(360, 360, 183, 0, Math.PI * 2, true); x.clip('evenodd');
-    x.save(); x.shadowColor = 'rgba(255,190,20,1)'; x.shadowBlur = 36 * S; x.fillStyle = '#ffc01a';
+    x.save(); x.shadowColor = 'rgba(255,190,20,1)'; x.shadowBlur = 30 * S; x.fillStyle = '#ffc01a';
     upgSectorPath(x, chance); x.fill(); x.restore();
     const g = x.createLinearGradient(0, 246, 0, 632);
     g.addColorStop(0, '#fff27a'); g.addColorStop(.4, '#ffe433'); g.addColorStop(.62, '#ffbd22'); g.addColorStop(.82, '#ff9028'); g.addColorStop(1, '#ff4a2a');
     upgSectorPath(x, chance); x.fillStyle = g; x.fill();
+    x.restore();
+    // то же тёмное гало у центрального диска, что и на самом секторе —
+    // иначе яркая заливка «съедает» его и кольцо выглядит расширившимся к центру
+    x.save();
+    upgSectorPath(x, chance); x.clip();
+    const rg = x.createRadialGradient(360, 360, 183, 360, 360, 216);
+    rg.addColorStop(0, 'rgba(0,0,0,.8)'); rg.addColorStop(.45, 'rgba(0,0,0,.36)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = rg; x.fillRect(0, 0, 720, 720);
     x.restore();
 }
 
@@ -3411,7 +3438,8 @@ function upgAnimate(win, chance) {
                 upg.spinAnimation = null;
             }
             upg.result = win ? 'win' : 'lose';
-            upg.glow = 1;
+            if (!win) upgPaintLose(chance);
+            upg.glow = win ? 1 : 0;
             upg.stack.classList.remove('is-spinning');
             upg.stack.classList.add(win ? 'is-win' : 'is-lose');
             upgDraw();
@@ -3512,6 +3540,7 @@ function upgInit() {
         return c;
     };
     upg.hotCv = mk('hot'); upg.hotCv.style.opacity = '0'; upg.hotCtx = upg.hotCv.getContext('2d');
+    upg.loseCv = mk('lose'); upg.loseCtx = upg.loseCv.getContext('2d');
     upg.stack = stack;
     const center = document.createElement('div');
     center.className = 'upg-center';
@@ -3533,10 +3562,11 @@ function upgInit() {
             const size = Math.round(Math.max(240, Math.min(420,width)) * Math.min(window.devicePixelRatio || 1,2));
             if (!width || size === upg.size) return;
             upg.size = size;
-            for (const layer of [upg.cv, upg.hotCv]) layer.width = layer.height = size;
+            for (const layer of [upg.cv, upg.hotCv, upg.loseCv]) layer.width = layer.height = size;
             upg.wheel = null; upg.scenes = {};
             upg.sceneKey = upg.textKey = upg.hotKey = null;
             upgDraw();
+            if (upg.stack.classList.contains('is-lose')) upgPaintLose(upg.loseChance || upg.chance);
         });
         upg.resizeObserver.observe(stack);
     }

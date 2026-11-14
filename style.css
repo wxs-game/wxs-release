@@ -5600,3 +5600,15 @@ html[data-route="upgrader"] .fairness-overlay { display: none; }
 #upgraderPage .upg-slider-control .upg-slider { pointer-events: none; }
 .upg-slider-visual { contain: none; }
 .upg-slider-control.is-drag .upg-liquid-thumb { transform: translate(-50%,-50%) scale(1.12,1.08); }
+
+
+/* победа: кольцо становится ярче и мягко пульсирует, форма не меняется */
+@keyframes upgHotPulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+.upg-stack.is-win .upg-layer-hot { animation: upgHotPulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .upg-stack.is-win .upg-layer-hot { animation: none; } }
+
+
+/* проигрыш: сектор красно-серый, новый раунд — мягко возвращается к жёлтому */
+.upg-stack .upg-layer-lose { opacity: 0; transition: opacity .7s ease; }
+.upg-stack.is-lose .upg-layer-lose { opacity: 1; transition-duration: .5s; }
+@media (prefers-reduced-motion: reduce) { .upg-stack .upg-layer-lose { transition: none; } }
