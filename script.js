@@ -3983,7 +3983,7 @@ else startApp();
     if (window.__lgPressLens) return;
     window.__lgPressLens = true;
     const CLICKABLE = 'button, [role="button"], [onclick], a[href], .pct-btn, .game-card, .nav-item, .bottom-nav a, summary';
-    const SKIP = 'input, textarea, select, .upg-slider-control, #tgBlockScreen';
+    const SKIP = 'input, textarea, select, .upg-slider-control, .bottom-nav, #tgBlockScreen';
     const svgOk = !!(window.CSS && CSS.supports && (CSS.supports('backdrop-filter', 'url(#glass-press)') || CSS.supports('-webkit-backdrop-filter', 'url(#glass-press)')));
     const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     let active = null;
@@ -3993,8 +3993,8 @@ else startApp();
         const el = l.el;
         if (reduce || fast) { el.remove(); return; }
         const a = el.animate(
-            [{ opacity: 1, transform: 'scale(1.04)' }, { opacity: 0, transform: 'scale(1.16)' }],
-            { duration: 380, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'forwards' }
+            [{ opacity: 1, transform: 'scale(1.06)' }, { opacity: 0, transform: 'scale(.94)' }],
+            { duration: 420, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'forwards' }
         );
         a.onfinish = () => el.remove();
         setTimeout(() => el.remove(), 700);
@@ -4008,18 +4008,19 @@ else startApp();
         if (big) {                                   // большая карточка — круглая линза под пальцем
             W = H = 120; L = x - 60; T = y - 60; rad = '50%';
         } else {                                     // кнопка — линза по её форме
-            const pad = 5;
+            const pad = Math.max(6, Math.min(14, Math.min(r.width, r.height) * 0.22));
             L = r.left - pad; T = r.top - pad; W = r.width + pad * 2; H = r.height + pad * 2;
             const br = parseFloat(getComputedStyle(target).borderTopLeftRadius) || 14;
-            rad = Math.min(br + pad, Math.min(W, H) / 2) + 'px';
+            // невысокие кнопки — «таблетка» как на панели меню, высокие — своё скругление
+            rad = (H <= 76 ? H / 2 : Math.min(br + pad, Math.min(W, H) / 2)) + 'px';
         }
         const el = document.createElement('div');
         el.className = 'lg-press-lens' + (svgOk ? ' lg-svg' : '');
         el.style.cssText = `left:${L}px;top:${T}px;width:${W}px;height:${H}px;border-radius:${rad};`;
         document.body.appendChild(el);
         if (!reduce) el.animate(
-            [{ opacity: 0, transform: 'scale(.82)' }, { opacity: 1, transform: 'scale(1.07)', offset: .6 }, { opacity: 1, transform: 'scale(1.04)' }],
-            { duration: 300, easing: 'cubic-bezier(.2,.9,.25,1.2)', fill: 'forwards' }
+            [{ opacity: 0, transform: 'scale(.72)' }, { opacity: 1, transform: 'scale(1.12)', offset: .55 }, { opacity: 1, transform: 'scale(1.06)' }],
+            { duration: 420, easing: 'cubic-bezier(.2,.9,.25,1.15)', fill: 'forwards' }
         );
         return { el, target };
     }
