@@ -4381,6 +4381,10 @@ else startApp();
         name.textContent = g.name;
         const price = document.createElement('em');
         price.textContent = money(usd(g));
+        if (view === 'catalog' && liveReady && liveOffers.size && !liveOffers.has(g.slug)) {
+            b.classList.add('is-unquoted');
+            price.textContent = money(usd(g)) + ' · скоро';
+        }
         b.append(frame, name, price);
         b.addEventListener('click', onPick);
         return b;
@@ -4393,8 +4397,6 @@ else startApp();
         for (const slug of serverCatalog.keys()) if (!all.has(slug)) all.set(slug, giftBy(slug));
         for (const slug of liveOffers.keys()) if (!all.has(slug)) all.set(slug, giftBy(slug));
         let items = [...all.values()].filter((g) => centsOf(g) != null);
-        // сервер даёт котировки не на все подарки из публичных каталогов — скрываем те, на которые играть нельзя
-        if (liveReady && liveOffers.size) items = items.filter((g) => liveOffers.has(g.slug));
         const st = stakeItem();
         if (st) { const v = centsOf(st); items = items.filter((g) => centsOf(g) > v); }   // только то, что дороже твоего подарка
         return items.sort((a, b) => centsOf(a) - centsOf(b) || a.name.localeCompare(b.name));

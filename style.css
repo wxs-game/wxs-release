@@ -5973,3 +5973,5 @@ body :is(button, .pct-btn, .mines-main-btn, .copy-btn, .copy-btn-icon, .crash-fb
 }
 .wxs-item-btn.is-gold { color: #151208; background: linear-gradient(180deg, #ffe477, #f2c919); border-color: rgba(255,228,119,.6); }
 .wxs-item-btn:disabled { opacity: .5; }
+
+.wxs-gift-card.is-unquoted { opacity: .45; filter: grayscale(.6); }
