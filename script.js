@@ -3950,7 +3950,8 @@ else startApp();
 // АПГРЕЙДЕР ПОДАРКАМИ — тот же интерфейс, что и у апгрейдера на $:
 // то же колесо, слайдер и панель ставки. В центре колеса — выбранный подарок
 // (пока не выбран — значок «выбрать подарок»), цены везде в $.
-// Раунд считает сервер (gift_upgrade_play), клиент только показывает итог.
+// Ставка: $ с баланса или свой подарок из инвентаря. Подарок из инвентаря
+// можно продать (−13% от цены). Раунд считает сервер, клиент только показывает итог.
 // ============================================================
 (function () {
     'use strict';
@@ -3962,12 +3963,11 @@ else startApp();
     const initData = tgApp?.initData || '';
     const G = window.WXG = { on: false, key: '', sync() {}, center() {}, play() {} };
 
-    // ---------- цены: GRAM → $ ----------
-    // Если у подарка есть предложение от сервера, цена берётся из него (в центах $).
-    // Для остальных — плавающий курс GRAM→$: считается по предложениям сервера,
-    // иначе подтягивается из рынка, иначе запасное значение.
-    const GRAM_USD_FALLBACK = 1.06;
-    let gramUsd = GRAM_USD_FALLBACK;
+    // ---------- цены ----------
+    // Цена в игре = 97% от флора. Курс GRAM→$ и цены приходят с сервера (gift_upgrade_state);
+    // запасные значения нужны, только пока сервер не ответил.
+    const DISCOUNT = 0.97, GRAM_USD_FALLBACK = 1.06;
+    let gramUsd = GRAM_USD_FALLBACK, rateFromServer = false;
     const snapshot = [
         ['xmasstocking', 'Xmas Stocking', 5], ['candycane', 'Candy Cane', 5], ['lolpop', 'Lol Pop', 5],
         ['cookieheart', 'Cookie Heart', 6], ['stellarrocket', 'Stellar Rocket', 6],
@@ -3984,50 +3984,49 @@ else startApp();
     ];
     let prices = new Map(snapshot.map(([slug, name, price]) => [slug, { slug, name, price }]));
     const listed = new Map();
+    let serverCatalog = new Map();     // slug → цена в центах (с сервера)
     let liveOffers = new Map();
     let inventory = [];
     let lastErr = '', liveReady = false, liveLoad = null, loadedAt = 0, catalogAsked = false, priceReq = null, rateAsked = false;
-    let targetSlug = null, view = 'catalog', pending = null, dollarBet = null;
+    let targetSlug = null, view = 'catalog', pending = null, dollarBet = null, stakeId = null, itemId = null, busy = false;
     const roundKey = 'wxs-gift-round:' + (tgApp?.initDataUnsafe?.user?.id ?? 'anon');
     try { pending = JSON.parse(sessionStorage.getItem(roundKey) || 'null'); } catch { pending = null; }
 
-    const giftBy = (slug) => prices.get(slug) || listed.get(slug) || { slug, name: slug };
-    const usd = (g) => {
-        const o = liveOffers.get(g.slug);
-        if (o && Date.parse(o.expires_at) > Date.now()) return o.price_cents / 100;
-        return Number.isFinite(g.price) ? g.price * gramUsd : null;
+    const pretty = (slug) => slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : '';
+    const giftBy = (slug) => prices.get(slug) || listed.get(slug) || { slug, name: pretty(slug) };
+    const offerOf = (slug) => {
+        const o = liveOffers.get(slug);
+        return o && Date.parse(o.expires_at) > Date.now() ? o : null;
     };
+    const centsOf = (g) => {
+        const o = offerOf(g.slug);
+        if (o) return o.price_cents;
+        const c = serverCatalog.get(g.slug);
+        if (c) return c;
+        return Number.isFinite(g.price) ? Math.max(100, Math.round(g.price * gramUsd * DISCOUNT * 100)) : null;
+    };
+    const usd = (g) => { const c = centsOf(g); return c == null ? null : c / 100; };
     const money = (v) => v == null ? '—' : (Math.round(v * 100) / 100).toFixed(2) + ' $';
+    const moneyC = (c) => c == null ? '—' : money(c / 100);
     const stakeFor = (cents, chance) => Math.max(1, Math.ceil(cents * chance / 95));
+    const sellCents = (g) => { const c = centsOf(g); return c == null ? null : Math.floor(c * 87 / 100); };
+    const stakeItem = () => inventory.find((i) => i.id === stakeId) || null;
 
     function target() {
         if (!targetSlug) return null;
         const g = giftBy(targetSlug);
-        const o = liveOffers.get(targetSlug);
-        const offer = o && Date.parse(o.expires_at) > Date.now() ? o : null;
-        const price = offer ? offer.price_cents / 100 : (Number.isFinite(g.price) ? g.price * gramUsd : null);
-        return { ...g, offer, usd: price, cents: price == null ? null : Math.round(price * 100) };
-    }
-
-    function calibrateRate() {
-        const ratios = [];
-        for (const [slug, o] of liveOffers) {
-            const p = prices.get(slug)?.price;
-            if (p > 0 && o.price_cents > 0) ratios.push(o.price_cents / 100 / p);
-        }
-        if (!ratios.length) return;
-        ratios.sort((a, b) => a - b);
-        const m = ratios[Math.floor(ratios.length / 2)];
-        if (m > 0.05 && m < 50) gramUsd = m;
+        const offer = offerOf(targetSlug);
+        const cents = centsOf(g);
+        return { ...g, offer, usd: cents == null ? null : cents / 100, cents };
     }
 
     async function fetchRate() {
-        if (rateAsked) return;
+        if (rateAsked || rateFromServer) return;
         rateAsked = true;
         try {
             const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=usd', { signal: AbortSignal.timeout(5000) });
             const v = (await r.json())?.['the-open-network']?.usd;
-            if (Number.isFinite(v) && v > 0.05 && v < 50 && !liveOffers.size) { gramUsd = v; paint(); }
+            if (Number.isFinite(v) && v > 0.05 && v < 50 && !rateFromServer) { gramUsd = v; paint(); }
         } catch { /* остаётся запасной курс */ }
     }
 
@@ -4057,12 +4056,15 @@ else startApp();
                 const state = await rpc('gift_upgrade_state');
                 liveOffers = new Map();
                 for (const o of state.offers || []) if (!liveOffers.has(o.gift_slug)) liveOffers.set(o.gift_slug, o);
+                serverCatalog = new Map((state.catalog || []).map((c) => [c.slug, Number(c.price_cents)]));
+                const rate = Number(state.rate);
+                if (rate > 0.05 && rate < 50) { gramUsd = rate; rateFromServer = true; }
                 inventory = (state.pending_gifts || []).map((g) => ({ ...giftBy(g.gift_slug), id: g.request_id, pending: true }));
-                calibrateRate();
+                if (stakeId && !inventory.some((i) => i.id === stakeId)) stakeId = null;
                 liveReady = true;
                 lastErr = '';
             } catch (e) { liveReady = false; lastErr = String(e?.message || e || 'ошибка'); }
-            finally { liveLoad = null; paint(); if (dlg.open) renderList(); }
+            finally { liveLoad = null; paint(); if (dlg.open) renderDialog(); }
         })();
         return liveLoad;
     }
@@ -4097,10 +4099,9 @@ else startApp();
                 const latest = parsePrices(await r.text());
                 const newest = [...latest.values()].reduce((d, g) => g.date > d ? g.date : d, '');
                 prices = new Map([...latest].filter(([, g]) => g.date === newest));
-                calibrateRate();
                 loadedAt = Date.now();
             } catch { /* остаются сохранённые цены */ }
-            finally { priceReq = null; paint(); if (dlg.open) renderList(); }
+            finally { priceReq = null; paint(); if (dlg.open) renderDialog(); }
         })();
     }
 
@@ -4118,7 +4119,7 @@ else startApp();
                 const slug = name?.toLowerCase().replace(/[^a-z0-9]/g, '');
                 if (slug) listed.set(slug, { slug, name });
             }
-            if (dlg.open && view === 'catalog') renderList();
+            if (dlg.open) renderDialog();
         } catch { catalogAsked = false; }
     }
 
@@ -4172,16 +4173,70 @@ else startApp();
         }
         upg.center?.classList.toggle('gift-empty', !t);
         $('wxsGiftCount').textContent = inventory.length;
-        G.key = (t?.slug || '') + ':' + (t?.cents ?? '') + ':' + (liveReady ? 1 : 0);
+        paintStake();
+        G.key = (t?.slug || '') + ':' + (t?.cents ?? '') + ':' + (stakeId || '') + ':' + (liveReady ? 1 : 0);
         upg.textKey = null;
         if (upg.ctx) upgDraw();
     }
 
-    // Подарок как приз: ставка и шанс связаны через его цену (шанс = 95% · ставка / цена)
+    // Карточка «ТВОЙ ПОДАРОК → подарок, который апгрейдишь» + кнопка выбора ставки подарком
+    function slotEl(g, caption, onClick) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'wxs-stake-slot' + (g ? '' : ' is-empty');
+        const cap = document.createElement('small');
+        cap.textContent = caption;
+        const img = document.createElement('span');
+        img.className = 'wxs-stake-img';
+        if (g) img.append(imageFor(g, true)); else img.innerHTML = '＋';
+        const name = document.createElement('strong');
+        name.textContent = g ? g.name : 'Выбрать';
+        const price = document.createElement('em');
+        price.textContent = g ? money(usd(g)) : '';
+        b.append(cap, img, name, price);
+        b.addEventListener('click', onClick);
+        return b;
+    }
+
+    function paintStake() {
+        const st = G.on ? stakeItem() : null;
+        const t = target();
+        page.classList.toggle('gift-stake', !!st);
+        const btn = $('wxsStakeBtn');
+        if (btn) { btn.hidden = !G.on; btn.classList.toggle('is-active', !!st); }
+        const box = $('wxsStakeBox');
+        if (!box) return;
+        box.hidden = !st;
+        if (!st) { box.replaceChildren(); return; }
+        const arrow = document.createElement('span');
+        arrow.className = 'wxs-stake-arrow';
+        arrow.textContent = '→';
+        const clear = document.createElement('button');
+        clear.type = 'button';
+        clear.className = 'wxs-stake-clear';
+        clear.setAttribute('aria-label', 'Убрать подарок');
+        clear.textContent = '×';
+        clear.addEventListener('click', () => { if (!upg.busy) { stakeId = null; paint(); upgRefresh(true); } });
+        box.replaceChildren(
+            slotEl(st, 'ТВОЙ ПОДАРОК', () => { if (!upg.busy) openDialog('stake'); }),
+            arrow,
+            slotEl(t, 'АПГРЕЙД ДО', () => { if (!upg.busy) openDialog('catalog'); }),
+            clear
+        );
+    }
+
+    // Ставка и шанс связаны через цену подарка: шанс = 95% · ставка / цена
     G.sync = (fromBet) => {
         const t = target();
-        if (!t?.cents) return;
         const input = $('upgBetInput');
+        const st = stakeItem();
+        if (st) {
+            const v = centsOf(st);
+            if (v && t?.cents) upg.chance = Math.max(UPG_MIN_CHANCE, Math.min(UPG_MAX_CHANCE, Math.round(95 * v / t.cents)));
+            if (v && input) input.value = (v / 100).toFixed(2);
+            return;
+        }
+        if (!t?.cents) return;
         if (fromBet) {
             const b = parseFloat(input.value);
             if (isFinite(b) && b > 0) {
@@ -4211,11 +4266,28 @@ else startApp();
         if (dlg.open) dlg.close();
     }
 
+    function setStake(id) {
+        stakeId = id;
+        const st = stakeItem(), t = target();
+        if (st && t && centsOf(t) <= centsOf(st)) targetSlug = null;   // цель должна быть дороже своего подарка
+        paint();
+        upgRefresh(true);
+        if (dlg.open) dlg.close();
+        if (st && !targetSlug) openDialog('catalog');
+    }
+
     // ---------- раунд ----------
     function storePending(round) {
         pending = round;
         try { round ? sessionStorage.setItem(roundKey, JSON.stringify(round)) : sessionStorage.removeItem(roundKey); } catch {}
     }
+
+    const ERR = {
+        insufficient_balance: 'Недостаточно средств на балансе!',
+        gift_not_found: 'Этот подарок уже недоступен.',
+        gift_unavailable: 'Подарок сейчас недоступен. Обновите цену и попробуйте ещё раз.',
+        invalid_gift_stake: 'Эта ставка не подходит для выбранного подарка.'
+    };
 
     G.play = async () => {
         if (upg.busy || isEconomyLocked) return;
@@ -4228,12 +4300,27 @@ else startApp();
                 : '\n\nДля «' + (t?.name || targetSlug) + '» сервер не выдал котировку (всего котировок: ' + liveOffers.size + ').'));
         }
 
-        const round = pending?.round;
-        let stake = round ? round.p_stake_cents : Math.round((parseFloat($('upgBetInput').value) || 0) * 100);
-        stake = Math.min(stake, stakeFor(t.offer.price_cents, UPG_MAX_CHANCE));
-        if (!(stake > 0)) return showMessage('Введите ставку.');
-        if (Math.floor(9500 * stake / t.offer.price_cents) < 100) return showMessage('Ставка слишком мала для этого подарка.');
-        if (!round && stake / 100 > currentBalance + 1e-9) return showMessage('Недостаточно средств на балансе!');
+        const resume = pending?.round ? pending : null;
+        const st = stakeItem();
+        let fn = 'gift_upgrade_play', body, cash = false;
+        if (resume) {
+            fn = resume.fn || 'gift_upgrade_play';
+            body = resume.round;
+        } else if (st) {
+            const v = centsOf(st);
+            if (!v || v >= t.offer.price_cents) return showMessage('Выбери подарок, который дороже твоего.');
+            if (Math.floor(9500 * v / t.offer.price_cents) < 100) return showMessage('Твой подарок слишком дешёвый для этого апгрейда.');
+            fn = 'gift_upgrade_play_gift';
+            body = { p_request: crypto.randomUUID(), p_quote: t.offer.id, p_stake_round: st.id };
+        } else {
+            let stake = Math.round((parseFloat($('upgBetInput').value) || 0) * 100);
+            stake = Math.min(stake, stakeFor(t.offer.price_cents, UPG_MAX_CHANCE));
+            if (!(stake > 0)) return showMessage('Введите ставку.');
+            if (Math.floor(9500 * stake / t.offer.price_cents) < 100) return showMessage('Ставка слишком мала для этого подарка.');
+            if (stake / 100 > currentBalance + 1e-9) return showMessage('Недостаточно средств на балансе!');
+            body = { p_request: crypto.randomUUID(), p_quote: t.offer.id, p_stake_cents: stake };
+            cash = true;
+        }
         if (!lockEconomy()) return;
 
         upg.busy = true;
@@ -4245,19 +4332,17 @@ else startApp();
 
         try {
             const snap = snapshotBalanceState();
-            const body = round || { p_request: crypto.randomUUID(), p_quote: t.offer.id, p_stake_cents: stake };
-            storePending({ round: body, slug: t.slug });
-            if (!round) setUIBalance(roundMoney(currentBalance - stake / 100));
+            storePending({ round: body, slug: t.slug, fn });
+            if (cash && !resume) setUIBalance(roundMoney(currentBalance - body.p_stake_cents / 100));
             let s;
             try {
-                s = await rpc('gift_upgrade_play', body);
+                s = await rpc(fn, body);
             } catch (e) {
                 if (e.retry === false) storePending(null);
                 restoreBalanceState(snap);
                 await refreshLive();
                 showMessage(pending ? 'Не удалось подтвердить результат. Нажмите ещё раз, чтобы проверить ставку.'
-                    : e.message === 'insufficient_balance' ? 'Недостаточно средств на балансе!'
-                    : 'Ставка не принята. Проверьте наличие подарка и баланс.');
+                    : ERR[e.message] || 'Ставка не принята. Проверьте наличие подарка и баланс.');
                 return;
             }
             storePending(null);
@@ -4274,13 +4359,13 @@ else startApp();
         }
     };
 
-    // ---------- каталог и инвентарь ----------
-    const dlg = $('wxsGiftDialog'), list = $('wxsGiftList'), search = $('wxsGiftSearch'), empty = $('wxsGiftEmpty');
+    // ---------- каталог, инвентарь, карточка подарка ----------
+    const dlg = $('wxsGiftDialog'), list = $('wxsGiftList'), search = $('wxsGiftSearch'), empty = $('wxsGiftEmpty'), itemBox = $('wxsGiftItem'), back = $('wxsGiftBack');
 
     function card(g, onPick, opts = {}) {
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'wxs-gift-card' + (opts.dim ? ' is-dim' : '') + (opts.selected ? ' is-selected' : '');
+        b.className = 'wxs-gift-card' + (opts.selected ? ' is-selected' : '');
         const frame = document.createElement('span');
         frame.className = 'wxs-gift-img';
         frame.append(imageFor(g, true));
@@ -4289,52 +4374,124 @@ else startApp();
         const price = document.createElement('em');
         price.textContent = money(usd(g));
         b.append(frame, name, price);
-        if (onPick) b.addEventListener('click', onPick); else b.classList.add('is-static');
+        b.addEventListener('click', onPick);
         return b;
     }
 
-    function renderList() {
-        const catalog = view === 'catalog';
-        const q = search.value.trim().toLocaleLowerCase();
+    function catalogItems() {
+        const all = new Map();
+        for (const g of listed.values()) all.set(g.slug, g);
+        for (const g of prices.values()) all.set(g.slug, { ...all.get(g.slug), ...g });
+        for (const slug of serverCatalog.keys()) if (!all.has(slug)) all.set(slug, giftBy(slug));
+        for (const slug of liveOffers.keys()) if (!all.has(slug)) all.set(slug, giftBy(slug));
+        let items = [...all.values()].filter((g) => centsOf(g) != null);
+        const st = stakeItem();
+        if (st) { const v = centsOf(st); items = items.filter((g) => centsOf(g) > v); }   // только то, что дороже твоего подарка
+        return items.sort((a, b) => centsOf(a) - centsOf(b) || a.name.localeCompare(b.name));
+    }
+
+    function renderItem() {
+        const item = inventory.find((i) => i.id === itemId);
+        if (!item) { view = 'inventory'; return renderDialog(); }
+        const sell = sellCents(item);
+        const img = document.createElement('div');
+        img.className = 'wxs-item-img';
+        img.append(imageFor(item, false));
+        const name = document.createElement('h3');
+        name.textContent = item.name;
+        const price = document.createElement('div');
+        price.className = 'wxs-item-price';
+        price.textContent = money(usd(item));
+        const up = document.createElement('button');
+        up.type = 'button';
+        up.className = 'wxs-item-btn is-gold';
+        up.textContent = 'Апгрейднуть';
+        up.addEventListener('click', () => setStake(item.id));
+        const sl = document.createElement('button');
+        sl.type = 'button';
+        sl.className = 'wxs-item-btn';
+        sl.textContent = 'Продать за ' + moneyC(sell);
+        sl.disabled = sell == null;
+        sl.addEventListener('click', async () => {
+            if (busy) return;
+            const ok = await new Promise((res) => tgApp?.showConfirm
+                ? tgApp.showConfirm('Продать ' + item.name + ' за ' + moneyC(sell) + '?', res) : res(true));
+            if (!ok) return;
+            busy = true; sl.disabled = up.disabled = true;
+            try {
+                const r = await rpc('gift_upgrade_sell', { p_request: item.id });
+                setUIBalance(Number(r.balance));
+                window.haptic?.('success');
+                if (stakeId === item.id) stakeId = null;
+                view = 'inventory';
+                await refreshLive();
+            } catch (e) {
+                showMessage(ERR[e.message] || 'Не удалось продать подарок. Попробуйте ещё раз.');
+                await refreshLive();
+                sl.disabled = up.disabled = false;
+            } finally { busy = false; }
+            renderDialog();
+        });
+        itemBox.replaceChildren(img, name, price, up, sl);
+    }
+
+    function renderDialog() {
         const sub = $('wxsGiftSub');
-        let items;
-        if (catalog) {
-            const all = new Map();
-            for (const g of listed.values()) all.set(g.slug, g);
-            for (const g of prices.values()) all.set(g.slug, { ...all.get(g.slug), ...g });
-            for (const slug of liveOffers.keys()) if (!all.has(slug)) all.set(slug, giftBy(slug));
-            // когда сервер выдал котировки — в каталоге ровно те подарки, на которые можно играть
-            items = [...all.values()].filter((g) => liveReady && liveOffers.size ? liveOffers.has(g.slug) : usd(g) != null);
-            items.sort((a, b) => (usd(a) ?? Infinity) - (usd(b) ?? Infinity) || a.name.localeCompare(b.name));
+        const isItem = view === 'item';
+        itemBox.hidden = !isItem;
+        back.hidden = !isItem;
+        list.hidden = isItem;
+        search.hidden = isItem || (view !== 'catalog' && !visibleInventory().length);
+        if (isItem) {
+            $('wxsGiftTitle').textContent = 'Подарок';
             sub.textContent = '';
+            empty.hidden = true;
+            return renderItem();
+        }
+        const q = search.value.trim().toLocaleLowerCase();
+        let items;
+        if (view === 'catalog') {
+            $('wxsGiftTitle').textContent = 'Каталог подарков';
+            sub.textContent = '';
+            items = catalogItems();
         } else {
-            items = inventory;
-            const total = inventory.reduce((s, g) => s + (usd(g) || 0), 0);
-            sub.textContent = inventory.length ? 'Всего ' + inventory.length + ' · на ' + money(total) : 'Выигранные подарки появятся здесь';
+            items = visibleInventory();
+            $('wxsGiftTitle').textContent = view === 'stake' ? 'Твой подарок' : 'Инвентарь';
+            const total = items.reduce((s, g) => s + (usd(g) || 0), 0);
+            sub.textContent = items.length && view === 'inventory' ? 'Всего ' + items.length + ' · на ' + money(total) : '';
         }
         const filtered = items.filter((g) => g.name.toLocaleLowerCase().includes(q));
-        list.replaceChildren(...filtered.map((g) => catalog
-            ? card(g, () => choose(g.slug), { selected: g.slug === targetSlug })
-            : card(g, null)));
+        list.replaceChildren(...filtered.map((g) => card(g, () => {
+            if (view === 'catalog') choose(g.slug);
+            else if (view === 'stake') setStake(g.id);
+            else { itemId = g.id; view = 'item'; renderDialog(); }
+        }, { selected: view === 'catalog' && g.slug === targetSlug })));
         empty.hidden = filtered.length > 0;
-        empty.innerHTML = q ? '<span>🔍</span><p>Ничего не найдено</p>' : '<span>🎁</span><p>Инвентарь пуст</p>';
-        search.hidden = !catalog && !inventory.length;
+        empty.innerHTML = q ? '<span>🔍</span><p>Ничего не найдено</p>' : '<span>🎁</span><p>' + (view === 'catalog' ? 'Подарков пока нет' : 'Инвентарь пуст') + '</p>';
+    }
+
+    // для выбора своего подарка: только те, что дешевле цели
+    function visibleInventory() {
+        if (view !== 'stake') return inventory;
+        const t = target();
+        return t?.cents ? inventory.filter((g) => centsOf(g) < t.cents) : inventory;
     }
 
     function openDialog(v) {
         view = v;
         search.value = '';
-        $('wxsGiftTitle').textContent = v === 'catalog' ? 'Каталог подарков' : 'Инвентарь';
-        renderList();
+        renderDialog();
         if (!dlg.open) dlg.showModal();
         refreshLive();
         if (v === 'catalog') { refreshPrices(); refreshCatalog(); fetchRate(); }
     }
 
     $('wxsGiftClose').addEventListener('click', () => dlg.close());
+    back.addEventListener('click', () => { view = 'inventory'; renderDialog(); });
     dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
-    search.addEventListener('input', renderList);
+    search.addEventListener('input', renderDialog);
     $('wxsGiftInventory').addEventListener('click', () => openDialog('inventory'));
+    $('wxsStakeBtn').addEventListener('click', () => { if (G.on && !upg.busy) openDialog('stake'); });
 
     // ---------- переключатель режима ----------
     function setMode(gifts) {
