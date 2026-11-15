@@ -51,6 +51,33 @@ window.WXS_CONFIG = Object.freeze({
     <title>WXS</title>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>html.wxs-access-pending body,html.wxs-access-denied body{visibility:hidden!important}html.wxs-access-denied{background:#090909!important}</style>
+    <script>
+    (() => {
+        const webApp = window.Telegram?.WebApp;
+        const initData = webApp?.initData || '';
+        if (!window.WXS_ROUTE || !initData) return;
+        const root = document.documentElement;
+        const namedBlock = webApp.initDataUnsafe?.user?.username?.toLowerCase() === 'svolk';
+        root.classList.add(namedBlock ? 'wxs-access-denied' : 'wxs-access-pending');
+        if (namedBlock) document.title = '';
+        const api = window.WXS_CONFIG;
+        window.WXS_APP_ACCESS = fetch(api.supabaseUrl + '/rest/v1/rpc/wxs_app_access', {
+            method: 'POST',
+            headers: { apikey: api.supabaseKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_init: initData }),
+            signal: AbortSignal.timeout(5500)
+        }).then(async (response) => {
+            const blocked = response.ok && await response.json() === false;
+            if (blocked || namedBlock) {
+                root.classList.add('wxs-access-denied');
+                document.title = '';
+                return false;
+            }
+            return response.ok;
+        }).catch(() => false).finally(() => root.classList.remove('wxs-access-pending'));
+    })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
 
@@ -263,7 +290,7 @@ window.WXS_CONFIG = Object.freeze({
         </div>
         <section id="wxsGiftMode" class="wxs-gift-mode" hidden>
             <div class="wxs-gift-stage upg-wheel-frame">
-                <span class="wxs-gift-demo">ДЕМОРЕЖИМ</span>
+                <span class="wxs-gift-demo" id="wxsGiftModeLabel">РЕЖИМ ПОДАРКОВ</span>
                 <button type="button" id="wxsGiftOpen" class="wxs-gift-open" aria-haspopup="dialog">
                     <svg viewBox="0 0 96 96" aria-hidden="true">
                         <rect x="4" y="4" width="88" height="88" rx="16" fill="none" stroke="currentColor" stroke-width="2.7" stroke-dasharray="8 7" stroke-linecap="round"/>
@@ -481,7 +508,7 @@ window.WXS_CONFIG = Object.freeze({
 
 <!-- Анимации ракеты и взрыва -->
 <script src="script.js?v=8"></script>
-<script src="upgrader-gifts.js?v=2" defer></script>
+<script src="upgrader-gifts.js?v=3" defer></script>
 </body>
 </html>
 
