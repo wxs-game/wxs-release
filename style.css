@@ -5879,3 +5879,26 @@ body :is(button, .pct-btn, .mines-main-btn, .copy-btn, .copy-btn-icon, .crash-fb
     box-shadow: 0 2px 10px rgba(242,201,25,.35), inset 0 1px 1px rgba(255,255,255,.6) !important;
 }
 #upgraderPage .wxs-inv-btn { min-height: 0; }
+
+/* Центр колеса: только подарок в кружке — без рамки, свечения и liquid glass */
+#upgraderPage .upg-center > .wxs-gift-pick,
+#upgraderPage .upg-center > .wxs-gift-pick:active,
+#upgraderPage .upg-center > .wxs-gift-pick:focus,
+#upgraderPage .upg-center > .wxs-gift-pick:focus-visible {
+    background: none !important; border: 0 !important; outline: 0 !important; box-shadow: none !important;
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-radius: 50% !important;
+    transform: translate(-50%, -50%) !important; filter: none !important;
+}
+.wxs-gift-art { box-shadow: none !important; background: none !important; border-radius: 50%; overflow: hidden; }
+.wxs-gift-art img { border-radius: 50%; }
+#wxsGiftSub:empty { display: none; }
+
+/* Переключатель режима: в одну строку, компактно */
+.wxs-upg-switch { flex-wrap: nowrap; }
+.wxs-seg { flex: none; }
+#upgraderPage .wxs-seg button, #upgraderPage .wxs-inv-btn {
+    white-space: nowrap; width: auto; height: auto; min-width: 0; min-height: 0; line-height: 1;
+}
+#upgraderPage .wxs-seg button { padding: 10px 14px; font-size: 13px; }
+#upgraderPage .wxs-inv-btn { padding: 10px 12px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; flex: none; }
+#upgraderPage .wxs-inv-btn b { margin: 0; line-height: 1; }

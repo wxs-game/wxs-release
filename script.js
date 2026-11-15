@@ -4221,8 +4221,7 @@ else startApp();
         let t = target();
         if (!t) return openDialog('catalog');
         if (!t.offer || !liveReady) { await refreshLive(); t = target(); }
-        if (!liveReady) return showMessage('Подарки сейчас недоступны. Попробуйте позже.');
-        if (!t?.offer) return showMessage('Этого подарка сейчас нет в наличии.');
+        if (!t?.offer) return showMessage('Не удалось загрузить цену подарка. Попробуйте ещё раз.');
 
         const round = pending?.round;
         let stake = round ? round.p_stake_cents : Math.round((parseFloat($('upgBetInput').value) || 0) * 100);
@@ -4285,11 +4284,6 @@ else startApp();
         const price = document.createElement('em');
         price.textContent = money(usd(g));
         b.append(frame, name, price);
-        if (opts.badge) {
-            const bd = document.createElement('i');
-            bd.textContent = opts.badge;
-            b.append(bd);
-        }
         if (onPick) b.addEventListener('click', onPick); else b.classList.add('is-static');
         return b;
     }
@@ -4304,9 +4298,9 @@ else startApp();
             for (const g of listed.values()) all.set(g.slug, g);
             for (const g of prices.values()) all.set(g.slug, { ...all.get(g.slug), ...g });
             for (const slug of liveOffers.keys()) if (!all.has(slug)) all.set(slug, giftBy(slug));
-            items = [...all.values()];
+            items = [...all.values()].filter((g) => usd(g) != null);
             items.sort((a, b) => (usd(a) ?? Infinity) - (usd(b) ?? Infinity) || a.name.localeCompare(b.name));
-            sub.textContent = 'Выбери подарок для апгрейда · цены в $';
+            sub.textContent = '';
         } else {
             items = inventory;
             const total = inventory.reduce((s, g) => s + (usd(g) || 0), 0);
@@ -4314,8 +4308,8 @@ else startApp();
         }
         const filtered = items.filter((g) => g.name.toLocaleLowerCase().includes(q));
         list.replaceChildren(...filtered.map((g) => catalog
-            ? card(g, () => choose(g.slug), { dim: liveReady && !liveOffers.has(g.slug), selected: g.slug === targetSlug, badge: liveReady && !liveOffers.has(g.slug) ? 'нет в наличии' : '' })
-            : card(g, null, { badge: g.pending ? 'ожидает выдачи' : '' })));
+            ? card(g, () => choose(g.slug), { selected: g.slug === targetSlug })
+            : card(g, null)));
         empty.hidden = filtered.length > 0;
         empty.innerHTML = q ? '<span>🔍</span><p>Ничего не найдено</p>' : '<span>🎁</span><p>Инвентарь пуст</p>';
         search.hidden = !catalog && !inventory.length;
@@ -4406,7 +4400,7 @@ else startApp();
     if (window.__lgPressLens) return;
     window.__lgPressLens = true;
     const CLICKABLE = 'button, [role="button"], [onclick], a[href], .pct-btn, .game-card, .nav-item, .bottom-nav a, summary';
-    const SKIP = 'input, textarea, select, .upg-slider-control, .bottom-nav, #tgBlockScreen';
+    const SKIP = 'input, textarea, select, .upg-slider-control, .bottom-nav, .wxs-gift-pick, #tgBlockScreen';
     const svgOk = !!(window.CSS && CSS.supports && (CSS.supports('backdrop-filter', 'url(#glass-press)') || CSS.supports('-webkit-backdrop-filter', 'url(#glass-press)')));
     const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     let active = null;
