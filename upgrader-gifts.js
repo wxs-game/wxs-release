@@ -5,6 +5,13 @@
     const mode = get('Mode');
     if (!mode) return;
 
+    const initData = window.Telegram?.WebApp?.initData || '';
+    const live = Boolean(initData);
+    if (live && document.documentElement.classList.contains('wxs-access-denied')) return;
+    let liveOffers = new Map();
+    let liveReady = false;
+    let liveLoad;
+    let pending;
     const dollar = get('Dollar');
     const dialog = get('Dialog');
     const search = get('Search');
@@ -74,7 +81,17 @@
         return [makeItem(prices.get(starter[0]))];
     }
 
-    let inventory = readInventory();
+    const roundKey = 'wxs-gift-round:' + userId;
+    let inventory = live ? [] : readInventory();
+    if (live) {
+        cashCents = 0;
+        try { pending = JSON.parse(sessionStorage.getItem(roundKey) || 'null'); } catch {}
+        get('CashType').textContent = 'Баланс $';
+        get('ItemType').hidden = true;
+        get('Rate').textContent = 'Выигрыши сохраняются в инвентаре. Выдача NFT пока недоступна.';
+    } else {
+        if (get('ModeLabel')) get('ModeLabel').textContent = 'ДЕМОРЕЖИМ';
+    }
 
     function saveInventory() {
         try {
@@ -83,7 +100,60 @@
             // Keep the inventory available in memory until the page closes.
         }
     }
-    saveInventory();
+    if (!live) saveInventory();
+
+    async function rpc(name, args = {}) {
+        const config = window.WXS_CONFIG;
+        const response = await fetch(config.supabaseUrl + '/rest/v1/rpc/' + name, {
+            method: 'POST',
+            headers: { apikey: config.supabaseKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_init: initData, ...args }),
+            signal: AbortSignal.timeout(8000)
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            const error = new Error(data.message || 'request_failed');
+            error.retry = response.status >= 500 || response.status === 401 || response.status === 429 || /^AUTH:/.test(error.message);
+            throw error;
+        }
+        return data;
+    }
+
+    function liveGift(slug) {
+        return prices.get(slug) || listedGifts.get(slug) || { slug, name: slug };
+    }
+
+    async function refreshLive() {
+        if (!live || liveLoad) return liveLoad;
+        liveLoad = (async () => {
+            try {
+                if (window.WXS_APP_ACCESS && !await window.WXS_APP_ACCESS) return;
+                const state = await rpc('gift_upgrade_state');
+                cashCents = Math.floor(Number(state.balance) * 100 + 1e-6);
+                liveOffers = new Map();
+                for (const offer of state.offers) {
+                    if (!liveOffers.has(offer.gift_slug)) liveOffers.set(offer.gift_slug, offer);
+                }
+                inventory = state.pending_gifts.map((gift) => ({ ...liveGift(gift.gift_slug), id: gift.request_id, pending: true }));
+                liveReady = true;
+            } catch {
+                liveReady = false;
+            } finally {
+                liveLoad = null;
+                update();
+                if (dialog.open) render();
+            }
+        })();
+        return liveLoad;
+    }
+
+    function storePending(round) {
+        pending = round;
+        try {
+            if (round) sessionStorage.setItem(roundKey, JSON.stringify(round));
+            else sessionStorage.removeItem(roundKey);
+        } catch {}
+    }
 
     function textPrice(price) {
         return currency.format(price) + ' GRAM';
@@ -109,7 +179,12 @@
     }
 
     function currentTarget() {
-        return prices.get(targetSlug) || listedGifts.get(targetSlug);
+        if (!live) return prices.get(targetSlug) || listedGifts.get(targetSlug);
+        if (!targetSlug) return;
+        const gift = liveGift(targetSlug);
+        const offer = liveOffers.get(targetSlug);
+        const active = offer && Date.parse(offer.expires_at) > Date.now() ? offer : null;
+        return { ...gift, marketPrice: gift.price, price: active ? active.price_cents / 100 : undefined, offer: active };
     }
 
     function centsForChance(target, chance) {
@@ -138,11 +213,17 @@
         const chance = Number.isFinite(bet) && bet > 0 && target?.price > bet
             ? Math.min(usingCash ? requestedChance ?? 90 : 90, 95 * bet / target.price)
             : 0;
+        const actualChance = live && target?.offer && Number.isSafeInteger(betCents)
+            && betCents > 0 && betCents < target.offer.price_cents
+            ? Math.min(9000, Math.floor(9500 * betCents / target.offer.price_cents)) / 100 : 0;
+        const playableChance = live ? (actualChance >= 1 ? actualChance : 0) : chance;
         const targetLabel = get('Target');
         targetLabel.hidden = !target;
-        targetLabel.textContent = target ? target.name + ' · ' + (target.price ? textPrice(target.price) : 'цена недоступна') : '';
+        const targetPrice = live && target?.price ? dollars(target.offer.price_cents)
+            : (target?.marketPrice ?? target?.price) ? textPrice(target.marketPrice ?? target.price) : 'цена недоступна';
+        targetLabel.textContent = target ? target.name + ' · ' + targetPrice : '';
         wheel.hidden = !target;
-        wheel.style.setProperty('--gift-sweep', (displayedRoundChance ?? chance) * 3.6 + 'deg');
+        wheel.style.setProperty('--gift-sweep', (displayedRoundChance ?? playableChance) * 3.6 + 'deg');
         if (target?.slug !== artSlug) {
             artSlug = target?.slug;
             art.replaceChildren(...(target ? [imageFor(target)] : []));
@@ -155,8 +236,9 @@
         get('Cash').hidden = !usingCash;
         get('CashType').setAttribute('aria-pressed', String(usingCash));
         get('ItemType').setAttribute('aria-pressed', String(!usingCash));
-        get('CashBalance').textContent = 'Демо-баланс ' + dollars(cashCents);
-        const displayedChance = displayedRoundChance ?? chance;
+        get('CashBalance').textContent = live ? (liveReady ? 'Баланс ' + dollars(cashCents) : 'Баланс недоступен')
+            : 'Демо-баланс ' + dollars(cashCents);
+        const displayedChance = displayedRoundChance ?? playableChance;
         get('Odds').textContent = displayedChance ? new Intl.NumberFormat('ru', { maximumFractionDigits: 2 }).format(displayedChance) + '%' : '—';
         slider.value = chance ? String(Math.round(chance)) : '75';
         slider.disabled = spinning || !usingCash || !target?.price;
@@ -167,9 +249,11 @@
             control.disabled = spinning;
         }
         const affordable = !usingCash || betCents <= cashCents;
-        play.disabled = spinning || !chance || !affordable;
-        play.textContent = spinning ? 'КРУТИМ…' : affordable ? 'АПГРЕЙДИТЬ' : 'НЕ ХВАТАЕТ ДЕМО $';
-        return { target, chance, betCents, usingCash };
+        play.disabled = spinning || (!pending && (!playableChance || !affordable || (live && !liveReady)));
+        play.textContent = spinning ? 'КРУТИМ…' : pending ? 'ПРОВЕРИТЬ СТАВКУ'
+            : live && target && !target.offer ? 'НЕТ В НАЛИЧИИ'
+            : affordable ? 'АПГРЕЙДИТЬ' : live ? 'НЕ ХВАТАЕТ СРЕДСТВ' : 'НЕ ХВАТАЕТ ДЕМО $';
+        return { target, chance: playableChance, betCents, usingCash };
     }
 
     document.querySelectorAll('[data-upg-mode]').forEach((button) => {
@@ -180,6 +264,7 @@
             });
             dollar.hidden = showGifts;
             mode.hidden = !showGifts;
+            if (showGifts) refreshLive();
         });
     });
 
@@ -268,7 +353,10 @@
         const name = document.createElement('strong');
         name.textContent = gift.name;
         const label = document.createElement('small');
-        label.textContent = gift.price ? textPrice(gift.price) : 'Цена недоступна';
+        const offer = liveOffers.get(gift.slug);
+        label.textContent = item.pending ? 'Ожидает выдачи' : live && offer ? dollars(offer.price_cents)
+            : gift.price ? textPrice(gift.price) : 'Цена недоступна';
+        if (item.pending) button.disabled = true;
         button.append(image, name, label);
         button.addEventListener('click', onSelect);
         return button;
@@ -277,8 +365,9 @@
     function render() {
         const catalog = view === 'catalog';
         const query = search.value.trim().toLocaleLowerCase();
+        const offerGifts = [...liveOffers.keys()].map((slug) => [slug, liveGift(slug)]);
         const entries = catalog
-            ? [...new Map([...listedGifts, ...prices]).values()].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity) || a.name.localeCompare(b.name))
+            ? [...new Map([...offerGifts, ...listedGifts, ...prices]).values()].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity) || a.name.localeCompare(b.name))
             : inventory;
         const filtered = entries.filter((gift) => gift.name.toLocaleLowerCase().includes(query));
         get('Source').hidden = !catalog;
@@ -288,7 +377,9 @@
         list.replaceChildren(...filtered.map((gift) => tile(gift, () => {
             if (catalog) {
                 targetSlug = gift.slug;
-                if (gift.price) setSuggestedAmount(gift);
+                const target = currentTarget();
+                if (target?.price) setSuggestedAmount(target);
+                else amount.value = '';
             } else {
                 stakeId = gift.id;
                 stakeType = 'gift';
@@ -298,7 +389,7 @@
             update();
             dialog.close();
         })));
-        if (!catalog && !inventory.length && !query) {
+        if (!live && !catalog && !inventory.length && !query) {
             const refill = document.createElement('button');
             refill.type = 'button';
             refill.textContent = 'Получить демоподарок';
@@ -320,6 +411,7 @@
         get('Title').textContent = view === 'catalog' ? 'Каталог Telegram-подарков' : 'Инвентарь';
         render();
         dialog.showModal();
+        if (live) refreshLive();
         if (view === 'catalog') {
             refreshPrices();
             refreshCatalog();
@@ -360,21 +452,52 @@
     play.addEventListener('click', async () => {
         const { target, chance, betCents, usingCash } = update();
         if (play.disabled) return;
-        const roll = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
-        const won = roll < chance / 100;
+        let won, angle, selected = target, charged = betCents;
         spinning = true;
-        displayedRoundChance = chance;
         result.hidden = true;
-        if (usingCash) cashCents -= betCents;
-        else {
-            inventory = inventory.filter((gift) => gift.id !== stakeId);
-            stakeId = undefined;
+
+        if (live) {
+            const round = pending || { p_request: crypto.randomUUID(), p_quote: target.offer.id, p_stake_cents: betCents };
+            storePending(round);
+            update();
+            try {
+                const settled = await rpc('gift_upgrade_play', round);
+                storePending(null);
+                won = settled.won;
+                angle = Number(settled.angle);
+                charged = settled.stake_cents;
+                targetSlug = settled.gift_slug;
+                selected = liveGift(targetSlug);
+                displayedRoundChance = Number(settled.chance_bp) / 100;
+                cashCents = Math.floor(Number(settled.balance) * 100 + 1e-6);
+                await refreshLive();
+            } catch (error) {
+                if (error.retry === false) storePending(null);
+                spinning = false;
+                await refreshLive();
+                result.dataset.win = 'false';
+                result.textContent = pending ? 'Не удалось подтвердить результат. Нажмите «Проверить ставку».'
+                    : error.message === 'insufficient_balance' ? 'Недостаточно средств.'
+                    : 'Ставка не принята. Проверьте наличие подарка и баланс.';
+                result.hidden = false;
+                update();
+                return;
+            }
+        } else {
+            const roll = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+            won = roll < chance / 100;
+            angle = roll * 360;
+            displayedRoundChance = chance;
+            if (usingCash) cashCents -= betCents;
+            else {
+                inventory = inventory.filter((gift) => gift.id !== stakeId);
+                stakeId = undefined;
+            }
+            if (won) inventory.push(makeItem(target));
+            saveInventory();
         }
-        if (won) inventory.push(makeItem(target));
-        saveInventory();
         update();
 
-        const angle = roll * 360;
         const landing = Math.floor(rotation / 360) * 360 + 5 * 360 + angle;
         if (rotor.animate && !window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
             try {
@@ -393,8 +516,8 @@
         update();
         result.dataset.win = String(won);
         result.textContent = won
-            ? 'Победа! ' + target.name + ' добавлен в инвентарь.'
-            : usingCash ? 'Мимо. Списано ' + dollars(betCents) + ' с демо-баланса.' : 'Мимо. Демоподарок списан.';
+            ? 'Победа! ' + selected.name + (live ? ' ожидает выдачи в инвентаре.' : ' добавлен в инвентарь.')
+            : usingCash ? 'Мимо. Списано ' + dollars(charged) + (live ? '.' : ' с демо-баланса.') : 'Мимо. Демоподарок списан.';
         result.hidden = false;
     });
     update();
