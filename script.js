@@ -3596,6 +3596,7 @@ function upgBindSlider() {
         const thumbX = left + (upg.shown - UPG_MIN_CHANCE) / (UPG_MAX_CHANCE - UPG_MIN_CHANCE) * w;
         offset = Math.abs(e.clientX - thumbX) <= 32 ? thumbX - e.clientX : 0;
         ctl.classList.add('is-drag');
+        upg.stack?.classList.add('upg-sliding');
         upgSliderInput(valueAt(e.clientX));
         e.preventDefault();
     });
@@ -3609,6 +3610,7 @@ function upgBindSlider() {
         pid = null;
         try { ctl.releasePointerCapture(e.pointerId); } catch (_) {}
         ctl.classList.remove('is-drag');
+        upg.stack?.classList.remove('upg-sliding');
         upgSliderEnd();
     };
     ctl.addEventListener('pointerup', end);

@@ -255,13 +255,6 @@ window.WXS_CONFIG = Object.freeze({
     </header>
 
 <main id="upgraderPage" class="upgrader-page hidden">
-    <div class="page-header" style="margin-top: 10px;">
-        <div class="header-space" aria-hidden="true"></div>
-
-        <h1>Апгрейдер</h1>
-        <div class="header-space"></div>
-    </div>
-
     <section class="wheel-card upg-card">
         <div class="upg-wheel-frame">
             <div class="upg-stage-heading"><span class="upg-live-dot" aria-hidden="true"></span><span id="upgStateLabel">ГОТОВ К АПГРЕЙДУ</span></div>
@@ -274,8 +267,6 @@ window.WXS_CONFIG = Object.freeze({
                 <input id="upgChanceSlider" class="upg-slider" type="range" min="1" max="90" step="0.01" value="40" aria-label="Шанс победы" aria-valuetext="40%" oninput="upgSliderInput(this.value)" onchange="upgSliderEnd()" onpointerup="upgSliderEnd()" onpointercancel="upgSliderEnd()" onkeydown="upgSliderKey(event)">
             </div>
         </div>
-        <div id="upgResult" class="upg-result"></div>
-        <div id="upgInfo" class="upg-info"></div>
 
         <div class="upg-panel">
             <div class="mines-bet-header">
