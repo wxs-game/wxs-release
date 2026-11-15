@@ -3375,7 +3375,7 @@ function upgDraw() {
 
     // 3) тексты — только если что-то изменилось
     const disp = Math.round(shown);
-    const tKey = disp + '|' + chance + '|' + bet + '|' + (upg.result || '') + '|' + (upg.result ? Math.round(upg.fade * 200) : 0) + '|' + upg.size + '|' + upgraderFreebetOn + '|' + upg.resultPayout;
+    const tKey = disp + '|' + chance + '|' + bet + '|' + (upg.result || '') + '|' + (upg.result ? Math.round(upg.fade * 200) : 0) + '|' + upg.size + '|' + upgraderFreebetOn + '|' + upg.resultPayout + '|' + (window.WXG?.key || '');
     if (upg.textKey !== tKey) {
         upg.textKey = tKey;
         const gross = upgCalc(bet, chance).payout;
@@ -3387,6 +3387,7 @@ function upgDraw() {
         upg.centerCaption.textContent = outcome === 'win' ? 'ЗАЧИСЛЕНО НА БАЛАНС' : outcome === 'lose' ? 'ПОПРОБУЙ ЕЩЁ' : 'ШАНС ПОБЕДЫ';
         upg.center.classList.toggle('is-result', !!outcome);
         upg.center.classList.toggle('is-win', outcome === 'win');
+        if (window.WXG?.on) WXG.center(outcome);
     }
 
     if (!upg.spinAnimation) upgSetRotorAngle(upg.theta);
@@ -3627,7 +3628,8 @@ function upgBindSlider() {
     ctl.addEventListener('lostpointercapture', end);
 }
 
-function upgRefresh(resetResult = true) {
+function upgRefresh(resetResult = true, src) {
+    if (window.WXG?.on) WXG.sync(src === 'bet');   // режим подарков: ставка и шанс связаны через цену подарка
     if (resetResult) upgFadeOut();     // стрелка остаётся где упала, свечение гаснет плавно
     document.querySelectorAll('.upg-chance-row .pct-btn').forEach(b =>
         b.classList.toggle('active', Number(b.dataset.chance) === upg.chance));
@@ -3747,18 +3749,18 @@ function upgAdjustChance(delta) { upgSetChance(upg.chance + delta); }
 function upgBetFactor(f) {
     if (upg.busy) return;
     applyBetFactor(document.getElementById('upgBetInput'), f);
-    upgRefresh(true);
+    upgRefresh(true, 'bet');
 }
 
 function upgBetMax() {
     if (upg.busy) return;
     applyBetMax(document.getElementById('upgBetInput'));
-    upgRefresh(true);
+    upgRefresh(true, 'bet');
 }
 
 function upgOnBetInput() {
     if (upg.busy) return;
-    upgRefresh(true);
+    upgRefresh(true, 'bet');
 }
 
 function upgOnChanceInput(commit) {
@@ -3792,6 +3794,7 @@ async function upgApi(bet, chance, freebetId) {
 }
 
 async function playUpgrader() {
+    if (window.WXG?.on) return WXG.play();
     if (upg.busy || isEconomyLocked) return;
     const fb = upgraderFreebetOn ? upgraderFreebets[0] : null;
     const bet = fb ? Number(fb.amount) : upgBet(), chance = upg.chance;
@@ -4051,4 +4054,414 @@ else startApp();
     document.addEventListener('pointercancel', up, { passive: true, capture: true });
     window.addEventListener('scroll', () => { if (active) up(); }, { passive: true, capture: true });
     window.addEventListener('blur', up);
+})();
+
+
+// ============================================================
+// АПГРЕЙДЕР ПОДАРКАМИ — тот же интерфейс, что и у апгрейдера на $:
+// то же колесо, слайдер и панель ставки. В центре колеса — выбранный подарок
+// (пока не выбран — значок «выбрать подарок»), цены везде в $.
+// Раунд считает сервер (gift_upgrade_play), клиент только показывает итог.
+// ============================================================
+(function () {
+    'use strict';
+    const page = document.getElementById('upgraderPage');
+    const sw = page?.querySelector('[data-upg-mode]');
+    if (!page || !sw) return;
+    const $ = (id) => document.getElementById(id);
+    const tgApp = window.Telegram?.WebApp;
+    const initData = tgApp?.initData || '';
+    const G = window.WXG = { on: false, key: '', sync() {}, center() {}, play() {} };
+
+    // ---------- цены: GRAM → $ ----------
+    // Если у подарка есть предложение от сервера, цена берётся из него (в центах $).
+    // Для остальных — плавающий курс GRAM→$: считается по предложениям сервера,
+    // иначе подтягивается из рынка, иначе запасное значение.
+    const GRAM_USD_FALLBACK = 1.4;
+    let gramUsd = GRAM_USD_FALLBACK;
+    const snapshot = [
+        ['xmasstocking', 'Xmas Stocking', 5], ['candycane', 'Candy Cane', 5], ['lolpop', 'Lol Pop', 5],
+        ['cookieheart', 'Cookie Heart', 6], ['stellarrocket', 'Stellar Rocket', 6],
+        ['lightsword', 'Light Sword', 7], ['bowtie', 'Bow Tie', 7],
+        ['moonpendant', 'Moon Pendant', 8], ['snowglobe', 'Snow Globe', 8],
+        ['bunnymuffin', 'Bunny Muffin', 10], ['finepen', 'Fine Pen', 10],
+        ['hangingstar', 'Hanging Star', 11], ['tophat', 'Top Hat', 12],
+        ['lovecandle', 'Love Candle', 13], ['sakuraflower', 'Sakura Flower', 14],
+        ['recordplayer', 'Record Player', 15], ['lovepotion', 'Love Potion', 18],
+        ['cupidcharm', 'Cupid Charm', 29], ['rarebird', 'Rare Bird', 33],
+        ['toybear', 'Toy Bear', 40], ['diamondring', 'Diamond Ring', 41],
+        ['genielamp', 'Genie Lamp', 44], ['swisswatch', 'Swiss Watch', 72],
+        ['lootbag', 'Loot Bag', 159], ['astralshard', 'Astral Shard', 167]
+    ];
+    let prices = new Map(snapshot.map(([slug, name, price]) => [slug, { slug, name, price }]));
+    const listed = new Map();
+    let liveOffers = new Map();
+    let inventory = [];
+    let liveReady = false, liveLoad = null, loadedAt = 0, catalogAsked = false, priceReq = null, rateAsked = false;
+    let targetSlug = null, view = 'catalog', pending = null, dollarBet = null;
+    const roundKey = 'wxs-gift-round:' + (tgApp?.initDataUnsafe?.user?.id ?? 'anon');
+    try { pending = JSON.parse(sessionStorage.getItem(roundKey) || 'null'); } catch { pending = null; }
+
+    const giftBy = (slug) => prices.get(slug) || listed.get(slug) || { slug, name: slug };
+    const usd = (g) => {
+        const o = liveOffers.get(g.slug);
+        if (o && Date.parse(o.expires_at) > Date.now()) return o.price_cents / 100;
+        return Number.isFinite(g.price) ? g.price * gramUsd : null;
+    };
+    const money = (v) => v == null ? '—' : (Math.round(v * 100) / 100).toFixed(2) + ' $';
+    const stakeFor = (cents, chance) => Math.max(1, Math.ceil(cents * chance / 95));
+
+    function target() {
+        if (!targetSlug) return null;
+        const g = giftBy(targetSlug);
+        const o = liveOffers.get(targetSlug);
+        const offer = o && Date.parse(o.expires_at) > Date.now() ? o : null;
+        const price = offer ? offer.price_cents / 100 : (Number.isFinite(g.price) ? g.price * gramUsd : null);
+        return { ...g, offer, usd: price, cents: price == null ? null : Math.round(price * 100) };
+    }
+
+    function calibrateRate() {
+        const ratios = [];
+        for (const [slug, o] of liveOffers) {
+            const p = prices.get(slug)?.price;
+            if (p > 0 && o.price_cents > 0) ratios.push(o.price_cents / 100 / p);
+        }
+        if (!ratios.length) return;
+        ratios.sort((a, b) => a - b);
+        const m = ratios[Math.floor(ratios.length / 2)];
+        if (m > 0.05 && m < 50) gramUsd = m;
+    }
+
+    async function fetchRate() {
+        if (rateAsked) return;
+        rateAsked = true;
+        try {
+            const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=usd', { signal: AbortSignal.timeout(5000) });
+            const v = (await r.json())?.['the-open-network']?.usd;
+            if (Number.isFinite(v) && v > 0.05 && v < 50 && !liveOffers.size) { gramUsd = v; paint(); }
+        } catch { /* остаётся запасной курс */ }
+    }
+
+    // ---------- сервер ----------
+    async function rpc(name, args = {}) {
+        const c = window.WXS_CONFIG;
+        const response = await fetch(c.supabaseUrl + '/rest/v1/rpc/' + name, {
+            method: 'POST',
+            headers: { apikey: c.supabaseKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_init: initData, ...args }),
+            signal: AbortSignal.timeout(8000)
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            const e = new Error(data.message || 'request_failed');
+            e.retry = response.status >= 500 || response.status === 401 || response.status === 429 || /^AUTH:/.test(e.message);
+            throw e;
+        }
+        return data;
+    }
+
+    async function refreshLive() {
+        if (liveLoad) return liveLoad;
+        liveLoad = (async () => {
+            try {
+                if (window.WXS_APP_ACCESS && !await window.WXS_APP_ACCESS) return;
+                const state = await rpc('gift_upgrade_state');
+                liveOffers = new Map();
+                for (const o of state.offers || []) if (!liveOffers.has(o.gift_slug)) liveOffers.set(o.gift_slug, o);
+                inventory = (state.pending_gifts || []).map((g) => ({ ...giftBy(g.gift_slug), id: g.request_id, pending: true }));
+                calibrateRate();
+                liveReady = true;
+            } catch { liveReady = false; }
+            finally { liveLoad = null; paint(); if (dlg.open) renderList(); }
+        })();
+        return liveLoad;
+    }
+
+    function parsePrices(csv) {
+        const [header, ...lines] = csv.trim().split(/\r?\n/);
+        const cols = header.replace(/^\uFEFF/, '').split(',');
+        const di = cols.indexOf('date'), si = cols.indexOf('collection_slug'), ni = cols.indexOf('collection_name'), pi = cols.indexOf('floor_gram');
+        if ([di, si, ni, pi].includes(-1)) throw new Error('format');
+        const latest = new Map();
+        for (const line of lines) {
+            const cells = line.match(/(?:^|,)(?:"(?:[^"]|"")*"|[^,]*)/g)?.map((cell, i) => {
+                const v = i ? cell.slice(1) : cell;
+                return v.startsWith('"') ? v.slice(1, -1).replaceAll('""', '"') : v;
+            });
+            if (!cells) continue;
+            const date = cells[di], slug = cells[si]?.toLowerCase().replace(/[^a-z0-9]/g, ''), name = cells[ni], price = Number(cells[pi]);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !slug || !name || !(price > 0)) continue;
+            if ((latest.get(slug)?.date ?? '') > date) continue;
+            latest.set(slug, { slug, name, price, date });
+        }
+        if (!latest.size) throw new Error('empty');
+        return latest;
+    }
+
+    function refreshPrices() {
+        if (priceReq || Date.now() - loadedAt < 15 * 60000) return;
+        priceReq = (async () => {
+            try {
+                const r = await fetch('https://tggifts.com/data/floors-daily.csv', { signal: AbortSignal.timeout(6500) });
+                if (!r.ok) throw new Error('http');
+                const latest = parsePrices(await r.text());
+                const newest = [...latest.values()].reduce((d, g) => g.date > d ? g.date : d, '');
+                prices = new Map([...latest].filter(([, g]) => g.date === newest));
+                calibrateRate();
+                loadedAt = Date.now();
+            } catch { /* остаются сохранённые цены */ }
+            finally { priceReq = null; paint(); if (dlg.open) renderList(); }
+        })();
+    }
+
+    async function refreshCatalog() {
+        if (catalogAsked) return;
+        catalogAsked = true;
+        try {
+            const r = await fetch('https://api.changes.tg/gifts', { signal: AbortSignal.timeout(6500) });
+            if (!r.ok) throw new Error('http');
+            const body = await r.json();
+            const names = Array.isArray(body) ? body : body.gifts;
+            if (!Array.isArray(names)) throw new Error('format');
+            for (const entry of names) {
+                const name = typeof entry === 'string' ? entry : entry?.name;
+                const slug = name?.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (slug) listed.set(slug, { slug, name });
+            }
+            if (dlg.open && view === 'catalog') renderList();
+        } catch { catalogAsked = false; }
+    }
+
+    // ---------- картинки ----------
+    function imageFor(g, lazy) {
+        const img = document.createElement('img');
+        img.alt = '';
+        img.loading = lazy ? 'lazy' : 'eager';
+        img.decoding = 'async';
+        img.src = 'https://nft.fragment.com/gift/' + g.slug + '-1.large.jpg';
+        img.addEventListener('error', () => {
+            img.addEventListener('error', () => {
+                const f = document.createElement('span');
+                f.className = 'wxs-gift-fallback';
+                f.textContent = '🎁';
+                img.replaceWith(f);
+            }, { once: true });
+            img.src = 'https://api.changes.tg/original/' + encodeURIComponent(g.slug) + '.png?size=256';
+        }, { once: true });
+        return img;
+    }
+
+    // ---------- центр колеса ----------
+    const PICK_SVG = '<svg class="wxs-gift-svg" viewBox="0 0 96 96" aria-hidden="true"><rect x="4" y="4" width="88" height="88" rx="18" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="9 8" stroke-linecap="round"/><path d="M48 36C33 39 25 32 29 25c4-8 14-6 19 11Zm0 0c15 3 23-4 19-11-4-8-14-6-19 11Z" fill="none" stroke="currentColor" stroke-width="5.7" stroke-linejoin="round"/><path d="M22 36h52a5 5 0 0 1 5 5v7a5 5 0 0 1-5 5H22a5 5 0 0 1-5-5v-7a5 5 0 0 1 5-5Zm0 22h52v15a8 8 0 0 1-8 8H30a8 8 0 0 1-8-8Z" fill="currentColor"/><path d="M48 40v44" stroke="var(--wxs-hole,#1b1b20)" stroke-width="7" stroke-linecap="round"/></svg>';
+    let artSlug = null;
+
+    function ensureCenter() {
+        if (!upg.center) return null;
+        let pick = upg.center.querySelector('.wxs-gift-pick');
+        if (!pick) {
+            pick = document.createElement('button');
+            pick.type = 'button';
+            pick.className = 'wxs-gift-pick';
+            pick.setAttribute('aria-label', 'Выбрать подарок');
+            pick.innerHTML = PICK_SVG + '<span class="wxs-gift-art"></span>';
+            pick.addEventListener('click', () => { if (G.on && !upg.busy) openDialog('catalog'); });
+            upg.center.appendChild(pick);
+        }
+        return pick;
+    }
+
+    function paint() {
+        const pick = ensureCenter();
+        const t = target();
+        if (pick) {
+            const slot = pick.querySelector('.wxs-gift-art');
+            if ((t?.slug || null) !== artSlug) {
+                artSlug = t?.slug || null;
+                slot.replaceChildren(...(t ? [imageFor(t)] : []));
+            }
+        }
+        upg.center?.classList.toggle('gift-empty', !t);
+        $('wxsGiftCount').textContent = inventory.length;
+        G.key = (t?.slug || '') + ':' + (t?.cents ?? '') + ':' + (liveReady ? 1 : 0);
+        upg.textKey = null;
+        if (upg.ctx) upgDraw();
+    }
+
+    // Подарок как приз: ставка и шанс связаны через его цену (шанс = 95% · ставка / цена)
+    G.sync = (fromBet) => {
+        const t = target();
+        if (!t?.cents) return;
+        const input = $('upgBetInput');
+        if (fromBet) {
+            const b = parseFloat(input.value);
+            if (isFinite(b) && b > 0) {
+                upg.chance = Math.max(UPG_MIN_CHANCE, Math.min(UPG_MAX_CHANCE, Math.round(95 * b * 100 / t.cents)));
+            }
+        } else {
+            input.value = (stakeFor(t.cents, upg.chance) / 100).toFixed(2);
+        }
+    };
+
+    G.center = (outcome) => {
+        const t = target();
+        upg.center.classList.toggle('gift-empty', !t);
+        if (!t) return;
+        if (outcome === 'win') {
+            upg.centerCoef.textContent = t.name;
+            upg.centerCaption.textContent = 'В ИНВЕНТАРЕ';
+        } else if (!outcome && t.usd && upg.betC > 0) {
+            upg.centerCoef.textContent = 'x' + (t.usd / upg.betC).toFixed(2);
+        }
+    };
+
+    function choose(slug) {
+        targetSlug = slug;
+        paint();
+        upgRefresh(true);
+        if (dlg.open) dlg.close();
+    }
+
+    // ---------- раунд ----------
+    function storePending(round) {
+        pending = round;
+        try { round ? sessionStorage.setItem(roundKey, JSON.stringify(round)) : sessionStorage.removeItem(roundKey); } catch {}
+    }
+
+    G.play = async () => {
+        if (upg.busy || isEconomyLocked) return;
+        let t = target();
+        if (!t) return openDialog('catalog');
+        if (!t.offer || !liveReady) { await refreshLive(); t = target(); }
+        if (!liveReady) return showMessage('Подарки сейчас недоступны. Попробуйте позже.');
+        if (!t?.offer) return showMessage('Этого подарка сейчас нет в наличии.');
+
+        const round = pending?.round;
+        let stake = round ? round.p_stake_cents : Math.round((parseFloat($('upgBetInput').value) || 0) * 100);
+        stake = Math.min(stake, stakeFor(t.offer.price_cents, UPG_MAX_CHANCE));
+        if (!(stake > 0)) return showMessage('Введите ставку.');
+        if (Math.floor(9500 * stake / t.offer.price_cents) < 100) return showMessage('Ставка слишком мала для этого подарка.');
+        if (!round && stake / 100 > currentBalance + 1e-9) return showMessage('Недостаточно средств на балансе!');
+        if (!lockEconomy()) return;
+
+        upg.busy = true;
+        upgSyncSlider();
+        const btn = $('upgPlayBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Вращение...'; btn.setAttribute('aria-busy', 'true'); }
+        page.classList.add('upg-locked');
+        document.body.classList.add('upg-spinning');
+
+        try {
+            const snap = snapshotBalanceState();
+            const body = round || { p_request: crypto.randomUUID(), p_quote: t.offer.id, p_stake_cents: stake };
+            storePending({ round: body, slug: t.slug });
+            if (!round) setUIBalance(roundMoney(currentBalance - stake / 100));
+            let s;
+            try {
+                s = await rpc('gift_upgrade_play', body);
+            } catch (e) {
+                if (e.retry === false) storePending(null);
+                restoreBalanceState(snap);
+                await refreshLive();
+                showMessage(pending ? 'Не удалось подтвердить результат. Нажмите ещё раз, чтобы проверить ставку.'
+                    : e.message === 'insufficient_balance' ? 'Недостаточно средств на балансе!'
+                    : 'Ставка не принята. Проверьте наличие подарка и баланс.');
+                return;
+            }
+            storePending(null);
+            const won = !!s.won;
+            if (s.gift_slug) targetSlug = s.gift_slug;
+            upg.resultPayout = 0;
+            setUIBalance(Number(s.balance));
+            await upgAnimate(won, upg.chance);
+            window.haptic?.(won ? 'success' : 'error');
+            await refreshLive();
+        } finally {
+            upgRelease();
+            if (pending && btn) btn.textContent = 'ПРОВЕРИТЬ СТАВКУ';
+        }
+    };
+
+    // ---------- каталог и инвентарь ----------
+    const dlg = $('wxsGiftDialog'), list = $('wxsGiftList'), search = $('wxsGiftSearch'), empty = $('wxsGiftEmpty');
+
+    function card(g, onPick, opts = {}) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'wxs-gift-card' + (opts.dim ? ' is-dim' : '') + (opts.selected ? ' is-selected' : '');
+        const frame = document.createElement('span');
+        frame.className = 'wxs-gift-img';
+        frame.append(imageFor(g, true));
+        const name = document.createElement('strong');
+        name.textContent = g.name;
+        const price = document.createElement('em');
+        price.textContent = money(usd(g));
+        b.append(frame, name, price);
+        if (opts.badge) {
+            const bd = document.createElement('i');
+            bd.textContent = opts.badge;
+            b.append(bd);
+        }
+        if (onPick) b.addEventListener('click', onPick); else b.classList.add('is-static');
+        return b;
+    }
+
+    function renderList() {
+        const catalog = view === 'catalog';
+        const q = search.value.trim().toLocaleLowerCase();
+        const sub = $('wxsGiftSub');
+        let items;
+        if (catalog) {
+            const all = new Map();
+            for (const g of listed.values()) all.set(g.slug, g);
+            for (const g of prices.values()) all.set(g.slug, { ...all.get(g.slug), ...g });
+            for (const slug of liveOffers.keys()) if (!all.has(slug)) all.set(slug, giftBy(slug));
+            items = [...all.values()];
+            items.sort((a, b) => (usd(a) ?? Infinity) - (usd(b) ?? Infinity) || a.name.localeCompare(b.name));
+            sub.textContent = 'Выбери подарок для апгрейда · цены в $';
+        } else {
+            items = inventory;
+            const total = inventory.reduce((s, g) => s + (usd(g) || 0), 0);
+            sub.textContent = inventory.length ? 'Всего ' + inventory.length + ' · на ' + money(total) : 'Выигранные подарки появятся здесь';
+        }
+        const filtered = items.filter((g) => g.name.toLocaleLowerCase().includes(q));
+        list.replaceChildren(...filtered.map((g) => catalog
+            ? card(g, () => choose(g.slug), { dim: liveReady && !liveOffers.has(g.slug), selected: g.slug === targetSlug, badge: liveReady && !liveOffers.has(g.slug) ? 'нет в наличии' : '' })
+            : card(g, null, { badge: g.pending ? 'ожидает выдачи' : '' })));
+        empty.hidden = filtered.length > 0;
+        empty.innerHTML = q ? '<span>🔍</span><p>Ничего не найдено</p>' : '<span>🎁</span><p>Инвентарь пуст</p>';
+        search.hidden = !catalog && !inventory.length;
+    }
+
+    function openDialog(v) {
+        view = v;
+        search.value = '';
+        $('wxsGiftTitle').textContent = v === 'catalog' ? 'Каталог подарков' : 'Инвентарь';
+        renderList();
+        if (!dlg.open) dlg.showModal();
+        refreshLive();
+        if (v === 'catalog') { refreshPrices(); refreshCatalog(); fetchRate(); }
+    }
+
+    $('wxsGiftClose').addEventListener('click', () => dlg.close());
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+    search.addEventListener('input', renderList);
+    $('wxsGiftInventory').addEventListener('click', () => openDialog('inventory'));
+
+    // ---------- переключатель режима ----------
+    function setMode(gifts) {
+        if (upg.busy) return;
+        const input = $('upgBetInput');
+        if (gifts && !G.on) dollarBet = input?.value ?? null;
+        if (!gifts && G.on && dollarBet != null && input) input.value = dollarBet;
+        G.on = gifts;
+        page.classList.toggle('gift-mode', gifts);
+        $('wxsGiftInventory').hidden = !gifts;
+        document.querySelectorAll('[data-upg-mode]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.upgMode === 'gifts') === gifts)));
+        if (upgraderFreebetOn && gifts) { upgraderFreebetOn = false; renderUpgraderFreebet?.(); }
+        ensureCenter();
+        if (gifts) refreshLive();
+        paint();
+        upgRefresh(true);
+    }
+    document.querySelectorAll('[data-upg-mode]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.upgMode === 'gifts')));
 })();
