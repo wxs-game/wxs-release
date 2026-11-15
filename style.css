@@ -5867,3 +5867,15 @@ body :is(button, .pct-btn, .mines-main-btn, .copy-btn, .copy-btn-icon, .crash-fb
 .wxs-gift-empty[hidden] { display: none; }
 .wxs-gift-empty span { font-size: 54px; filter: grayscale(.5); }
 .wxs-gift-empty p { margin: 0; font-weight: 700; }
+
+/* Переключатель режима: перебиваем общий «стеклянный» скин кнопок апгрейдера */
+#upgraderPage .wxs-seg button {
+    background: transparent !important; border: 0 !important; box-shadow: none !important;
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important; color: #9a98a1;
+}
+#upgraderPage .wxs-seg button[aria-pressed="true"] {
+    color: #151208 !important;
+    background: linear-gradient(180deg, #ffe477, #f2c919) !important;
+    box-shadow: 0 2px 10px rgba(242,201,25,.35), inset 0 1px 1px rgba(255,255,255,.6) !important;
+}
+#upgraderPage .wxs-inv-btn { min-height: 0; }

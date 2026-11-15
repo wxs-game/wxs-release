@@ -3945,117 +3945,6 @@ async function startApp() {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startApp);
 else startApp();
 
-})();
-
-
-// Player glass press: delegated so realtime row replacements need no new listeners.
-(function initPlayerGlassPress() {
-    const list = document.getElementById('crashPlayersList');
-    if (!list) return;
-    let pressed = null;
-    function release() {
-        if (!pressed) return;
-        pressed.row.classList.remove('is-glass-pressed');
-        pressed.row.style.removeProperty('--player-press-x');
-        pressed.row.style.removeProperty('--player-press-y');
-        pressed = null;
-    }
-    list.addEventListener('pointerdown', e => {
-        if (!e.isPrimary || e.button !== 0) return;
-        release();
-        const row = e.target.closest('.crash-player-row');
-        if (!row || !list.contains(row)) return;
-        const rect = row.getBoundingClientRect();
-        row.style.setProperty('--player-press-x', ((e.clientX - rect.left) / rect.width * 100) + '%');
-        row.style.setProperty('--player-press-y', ((e.clientY - rect.top) / rect.height * 100) + '%');
-        row.classList.add('is-glass-pressed');
-        pressed = { row, id: e.pointerId, x: e.clientX, y: e.clientY };
-    }, { passive: true });
-    document.addEventListener('pointermove', e => {
-        if (pressed && e.pointerId === pressed.id &&
-            Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) > 8) release();
-    }, { passive: true });
-    function endPointer(e) {
-        if (pressed && e.pointerId === pressed.id) release();
-    }
-    document.addEventListener('pointerup', endPointer, { passive: true });
-    document.addEventListener('pointercancel', endPointer, { passive: true });
-    list.addEventListener('scroll', release, { passive: true });
-    window.addEventListener('blur', release);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) release(); });
-})();
-
-
-
-
-// ============================================================
-// LIQUID GLASS: живое преломление при нажатии на любые кнопки/карточки.
-// Под пальцем появляется стеклянная линза (SVG-карта смещения), которая
-// «выпучивается», преломляет то, что под ней, и мягко тает при отпускании.
-// ============================================================
-(function () {
-    if (window.__lgPressLens) return;
-    window.__lgPressLens = true;
-    const CLICKABLE = 'button, [role="button"], [onclick], a[href], .pct-btn, .game-card, .nav-item, .bottom-nav a, summary';
-    const SKIP = 'input, textarea, select, .upg-slider-control, .bottom-nav, #tgBlockScreen';
-    const svgOk = !!(window.CSS && CSS.supports && (CSS.supports('backdrop-filter', 'url(#glass-press)') || CSS.supports('-webkit-backdrop-filter', 'url(#glass-press)')));
-    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let active = null;
-
-    function dispose(l, fast) {
-        if (!l) return;
-        const el = l.el;
-        if (reduce || fast) { el.remove(); return; }
-        const a = el.animate(
-            [{ opacity: 1, transform: 'scale(1.06)' }, { opacity: 0, transform: 'scale(.94)' }],
-            { duration: 420, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'forwards' }
-        );
-        a.onfinish = () => el.remove();
-        setTimeout(() => el.remove(), 700);
-    }
-
-    function create(target, x, y) {
-        const r = target.getBoundingClientRect();
-        if (!r.width || !r.height) return null;
-        const big = r.width > 240 || r.height > 140;
-        let L, T, W, H, rad;
-        if (big) {                                   // большая карточка — круглая линза под пальцем
-            W = H = 120; L = x - 60; T = y - 60; rad = '50%';
-        } else {                                     // кнопка — линза по её форме
-            const pad = Math.max(6, Math.min(14, Math.min(r.width, r.height) * 0.22));
-            L = r.left - pad; T = r.top - pad; W = r.width + pad * 2; H = r.height + pad * 2;
-            const br = parseFloat(getComputedStyle(target).borderTopLeftRadius) || 14;
-            // невысокие кнопки — «таблетка» как на панели меню, высокие — своё скругление
-            rad = (H <= 76 ? H / 2 : Math.min(br + pad, Math.min(W, H) / 2)) + 'px';
-        }
-        const el = document.createElement('div');
-        el.className = 'lg-press-lens' + (svgOk ? ' lg-svg' : '');
-        el.style.cssText = `left:${L}px;top:${T}px;width:${W}px;height:${H}px;border-radius:${rad};`;
-        document.body.appendChild(el);
-        if (!reduce) el.animate(
-            [{ opacity: 0, transform: 'scale(.72)' }, { opacity: 1, transform: 'scale(1.12)', offset: .55 }, { opacity: 1, transform: 'scale(1.06)' }],
-            { duration: 420, easing: 'cubic-bezier(.2,.9,.25,1.15)', fill: 'forwards' }
-        );
-        return { el, target };
-    }
-
-    function down(e) {
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
-        const t = e.target && e.target.closest ? e.target.closest(CLICKABLE) : null;
-        if (!t || t.disabled || t.getAttribute('aria-disabled') === 'true') return;
-        if (e.target.closest(SKIP)) return;
-        dispose(active, true);
-        active = create(t, e.clientX, e.clientY);
-    }
-    function up() { const l = active; active = null; dispose(l, false); }
-
-    document.addEventListener('pointerdown', down, { passive: true, capture: true });
-    document.addEventListener('pointerup', up, { passive: true, capture: true });
-    document.addEventListener('pointercancel', up, { passive: true, capture: true });
-    window.addEventListener('scroll', () => { if (active) up(); }, { passive: true, capture: true });
-    window.addEventListener('blur', up);
-})();
-
 
 // ============================================================
 // АПГРЕЙДЕР ПОДАРКАМИ — тот же интерфейс, что и у апгрейдера на $:
@@ -4464,4 +4353,114 @@ else startApp();
         upgRefresh(true);
     }
     document.querySelectorAll('[data-upg-mode]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.upgMode === 'gifts')));
+})();
+})();
+
+
+// Player glass press: delegated so realtime row replacements need no new listeners.
+(function initPlayerGlassPress() {
+    const list = document.getElementById('crashPlayersList');
+    if (!list) return;
+    let pressed = null;
+    function release() {
+        if (!pressed) return;
+        pressed.row.classList.remove('is-glass-pressed');
+        pressed.row.style.removeProperty('--player-press-x');
+        pressed.row.style.removeProperty('--player-press-y');
+        pressed = null;
+    }
+    list.addEventListener('pointerdown', e => {
+        if (!e.isPrimary || e.button !== 0) return;
+        release();
+        const row = e.target.closest('.crash-player-row');
+        if (!row || !list.contains(row)) return;
+        const rect = row.getBoundingClientRect();
+        row.style.setProperty('--player-press-x', ((e.clientX - rect.left) / rect.width * 100) + '%');
+        row.style.setProperty('--player-press-y', ((e.clientY - rect.top) / rect.height * 100) + '%');
+        row.classList.add('is-glass-pressed');
+        pressed = { row, id: e.pointerId, x: e.clientX, y: e.clientY };
+    }, { passive: true });
+    document.addEventListener('pointermove', e => {
+        if (pressed && e.pointerId === pressed.id &&
+            Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) > 8) release();
+    }, { passive: true });
+    function endPointer(e) {
+        if (pressed && e.pointerId === pressed.id) release();
+    }
+    document.addEventListener('pointerup', endPointer, { passive: true });
+    document.addEventListener('pointercancel', endPointer, { passive: true });
+    list.addEventListener('scroll', release, { passive: true });
+    window.addEventListener('blur', release);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) release(); });
+})();
+
+
+
+
+// ============================================================
+// LIQUID GLASS: живое преломление при нажатии на любые кнопки/карточки.
+// Под пальцем появляется стеклянная линза (SVG-карта смещения), которая
+// «выпучивается», преломляет то, что под ней, и мягко тает при отпускании.
+// ============================================================
+(function () {
+    if (window.__lgPressLens) return;
+    window.__lgPressLens = true;
+    const CLICKABLE = 'button, [role="button"], [onclick], a[href], .pct-btn, .game-card, .nav-item, .bottom-nav a, summary';
+    const SKIP = 'input, textarea, select, .upg-slider-control, .bottom-nav, #tgBlockScreen';
+    const svgOk = !!(window.CSS && CSS.supports && (CSS.supports('backdrop-filter', 'url(#glass-press)') || CSS.supports('-webkit-backdrop-filter', 'url(#glass-press)')));
+    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let active = null;
+
+    function dispose(l, fast) {
+        if (!l) return;
+        const el = l.el;
+        if (reduce || fast) { el.remove(); return; }
+        const a = el.animate(
+            [{ opacity: 1, transform: 'scale(1.06)' }, { opacity: 0, transform: 'scale(.94)' }],
+            { duration: 420, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'forwards' }
+        );
+        a.onfinish = () => el.remove();
+        setTimeout(() => el.remove(), 700);
+    }
+
+    function create(target, x, y) {
+        const r = target.getBoundingClientRect();
+        if (!r.width || !r.height) return null;
+        const big = r.width > 240 || r.height > 140;
+        let L, T, W, H, rad;
+        if (big) {                                   // большая карточка — круглая линза под пальцем
+            W = H = 120; L = x - 60; T = y - 60; rad = '50%';
+        } else {                                     // кнопка — линза по её форме
+            const pad = Math.max(6, Math.min(14, Math.min(r.width, r.height) * 0.22));
+            L = r.left - pad; T = r.top - pad; W = r.width + pad * 2; H = r.height + pad * 2;
+            const br = parseFloat(getComputedStyle(target).borderTopLeftRadius) || 14;
+            // невысокие кнопки — «таблетка» как на панели меню, высокие — своё скругление
+            rad = (H <= 76 ? H / 2 : Math.min(br + pad, Math.min(W, H) / 2)) + 'px';
+        }
+        const el = document.createElement('div');
+        el.className = 'lg-press-lens' + (svgOk ? ' lg-svg' : '');
+        el.style.cssText = `left:${L}px;top:${T}px;width:${W}px;height:${H}px;border-radius:${rad};`;
+        document.body.appendChild(el);
+        if (!reduce) el.animate(
+            [{ opacity: 0, transform: 'scale(.72)' }, { opacity: 1, transform: 'scale(1.12)', offset: .55 }, { opacity: 1, transform: 'scale(1.06)' }],
+            { duration: 420, easing: 'cubic-bezier(.2,.9,.25,1.15)', fill: 'forwards' }
+        );
+        return { el, target };
+    }
+
+    function down(e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        const t = e.target && e.target.closest ? e.target.closest(CLICKABLE) : null;
+        if (!t || t.disabled || t.getAttribute('aria-disabled') === 'true') return;
+        if (e.target.closest(SKIP)) return;
+        dispose(active, true);
+        active = create(t, e.clientX, e.clientY);
+    }
+    function up() { const l = active; active = null; dispose(l, false); }
+
+    document.addEventListener('pointerdown', down, { passive: true, capture: true });
+    document.addEventListener('pointerup', up, { passive: true, capture: true });
+    document.addEventListener('pointercancel', up, { passive: true, capture: true });
+    window.addEventListener('scroll', () => { if (active) up(); }, { passive: true, capture: true });
+    window.addEventListener('blur', up);
 })();
