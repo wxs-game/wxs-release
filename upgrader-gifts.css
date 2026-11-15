@@ -1,0 +1,34 @@
+#upgraderPage .wxs-upg-switch {display:flex; justify-content:flex-end; gap:4px; margin:0 0 10px}
+#wxsGiftMode[hidden],#wxsGiftDollar[hidden],.wxs-gift-mode [hidden] {display:none!important}
+.wxs-upg-switch button,.wxs-gift-stake,.wxs-gift-nav button,.wxs-gift-mode dialog button {font:inherit; color:#f5f4f0; background:#17171b; border:1px solid #35343c; border-radius:11px; padding:9px 12px; cursor:pointer}
+.wxs-upg-switch button[aria-pressed=true],.wxs-gift-nav button[aria-current] {color:#ffdb6c; border-color:#695626; background:#252014}
+.wxs-gift-mode {color:#f5f4f0}
+.wxs-gift-stage {position:relative; min-height:300px; display:grid; place-items:center; align-content:center; gap:12px; padding:32px 14px 16px; border:1px solid #26262e; border-radius:18px; background:linear-gradient(#14151c,#09090d)}
+.wxs-gift-demo {position:absolute; top:12px; left:14px; font-size:10px; font-weight:800; letter-spacing:.09em; color:#aaa8b0}
+.wxs-gift-open {display:grid; justify-items:center; gap:12px; font:inherit; font-weight:800; color:#c7c6cc; background:none; border:0; cursor:pointer}
+.wxs-gift-open svg {width:min(43vw,155px); color:inherit}
+.wxs-gift-open:hover,.wxs-gift-open:focus-visible {color:#ffda68}
+.wxs-gift-choice {text-align:center; font-size:13px; color:#ffda68}
+.wxs-gift-panel {display:grid; gap:12px; margin-top:12px; border:1px solid #26262e; border-radius:16px; padding:14px; background:#101014}
+.wxs-gift-odds {display:flex; justify-content:space-between; font-size:13px; color:#c7c4ce}
+.wxs-gift-odds strong,.wxs-gift-nav span {color:#ffda68}
+.wxs-gift-panel .mines-main-btn {width:100%; margin:0}
+.wxs-gift-panel .mines-main-btn:disabled {opacity:.45; cursor:default}
+#wxsGiftResult {margin:0; text-align:center; font-size:13px; font-weight:800}
+#wxsGiftResult[data-win=true] {color:#7ef0a5}
+#wxsGiftResult[data-win=false] {color:#ff847c}
+.wxs-gift-nav {position:sticky; bottom:0; z-index:1; display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:10px 0 max(8px,env(safe-area-inset-bottom)); background:#101014}
+.wxs-gift-mode dialog {box-sizing:border-box; width:min(calc(100% - 20px),480px); max-height:80vh; margin:auto auto max(10px,env(safe-area-inset-bottom)); border:1px solid #3c3543; border-radius:18px; padding:16px; background:#14141a; color:#f5f4f0}
+.wxs-gift-mode dialog::backdrop {background:#000b}
+.wxs-gift-mode dialog header {display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:12px}
+.wxs-gift-mode dialog h2 {margin:0; font-size:18px}
+.wxs-gift-mode dialog input {box-sizing:border-box; width:100%; border:1px solid #3c3543; border-radius:10px; background:#09090d; color:#fff; padding:10px; font:inherit}
+#wxsGiftSource,#wxsGiftNotice {font-size:12px; color:#c7c4ce; margin:10px 0}
+#wxsGiftSource a {color:#ffda68}
+.wxs-gift-grid {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px}
+.wxs-gift-mode dialog .wxs-gift-tile {text-align:center; display:grid; justify-items:center; gap:6px; overflow-wrap:anywhere; font-size:12px}
+.wxs-gift-tile img,.wxs-gift-tile .wxs-gift-fallback {width:60px; height:60px; object-fit:cover; border-radius:10px}
+.wxs-gift-tile .wxs-gift-fallback {display:grid; place-items:center; background:#27222a; font-size:27px}
+.wxs-gift-tile small {color:#ffda68}
+
+#wxsGiftDollar:not([hidden]) {display:contents}
