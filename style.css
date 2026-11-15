@@ -5757,13 +5757,7 @@ body :is(button, .pct-btn, .mines-main-btn, .copy-btn, .copy-btn-icon, .crash-fb
 }
 
 
-/* Апгрейдер: без заголовка страницы, отступ сверху у карточки */
-#upgraderPage > .upg-card { margin-top: 10px; }
-
-/* Свечение пропадает, пока двигаешь ползунок, и плавно возвращается, когда отпускаешь */
-.upg-slider-control .upg-liquid-thumb { transition: transform .16s ease, box-shadow .35s ease; }
-.upg-slider-control.is-drag .upg-liquid-thumb {
-    box-shadow: 0 3px 8px #000a, inset 0 1px 1px #fff, inset 0 -1px 2px rgba(255,255,255,.25);
-}
-.upg-stack .upg-layer-hot { transition: opacity .45s ease; }
-.upg-stack.upg-sliding .upg-layer-hot { opacity: 0 !important; animation: none; transition-duration: .15s; }
+/* Апгрейдер: игра максимально вверх, без пустоты под шапкой профиля */
+#upgraderPage { padding-top: 4px; }
+#upgraderPage > .upg-card { margin-top: 0; padding-top: 0; }
+#upgraderPage .upg-wheel-frame { margin-top: 0; }

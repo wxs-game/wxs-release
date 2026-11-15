@@ -3199,6 +3199,17 @@ function upgPaintSector(x, chance, fast, lose) {
     }
     x.save();
     if (!fast) { x.shadowColor = lose ? 'rgba(210,50,60,.4)' : 'rgba(255,198,0,.55)'; x.shadowBlur = 24 * S; }
+    else {
+        // свечение не гаснет при движении слайдера: дешёвая замена размытой тени — несколько мягких обводок
+        x.save();
+        upgSectorPath(x, chance);
+        x.lineJoin = 'round';
+        const gc = lose ? '210,50,60' : '255,198,0';
+        for (const [w, a] of [[34, .05], [24, .07], [15, .1], [8, .14], [3, .18]]) {
+            x.lineWidth = w; x.strokeStyle = `rgba(${gc},${a})`; x.stroke();
+        }
+        x.restore();
+    }
     upgSectorPath(x, chance); x.fillStyle = g; x.fill();
     x.restore();
     // тёмное гало от центрального диска
@@ -3596,7 +3607,6 @@ function upgBindSlider() {
         const thumbX = left + (upg.shown - UPG_MIN_CHANCE) / (UPG_MAX_CHANCE - UPG_MIN_CHANCE) * w;
         offset = Math.abs(e.clientX - thumbX) <= 32 ? thumbX - e.clientX : 0;
         ctl.classList.add('is-drag');
-        upg.stack?.classList.add('upg-sliding');
         upgSliderInput(valueAt(e.clientX));
         e.preventDefault();
     });
@@ -3610,7 +3620,6 @@ function upgBindSlider() {
         pid = null;
         try { ctl.releasePointerCapture(e.pointerId); } catch (_) {}
         ctl.classList.remove('is-drag');
-        upg.stack?.classList.remove('upg-sliding');
         upgSliderEnd();
     };
     ctl.addEventListener('pointerup', end);
