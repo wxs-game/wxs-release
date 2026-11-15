@@ -3966,7 +3966,7 @@ else startApp();
     // Если у подарка есть предложение от сервера, цена берётся из него (в центах $).
     // Для остальных — плавающий курс GRAM→$: считается по предложениям сервера,
     // иначе подтягивается из рынка, иначе запасное значение.
-    const GRAM_USD_FALLBACK = 1.4;
+    const GRAM_USD_FALLBACK = 1.06;
     let gramUsd = GRAM_USD_FALLBACK;
     const snapshot = [
         ['xmasstocking', 'Xmas Stocking', 5], ['candycane', 'Candy Cane', 5], ['lolpop', 'Lol Pop', 5],
@@ -4348,7 +4348,12 @@ else startApp();
         document.querySelectorAll('[data-upg-mode]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.upgMode === 'gifts') === gifts)));
         if (upgraderFreebetOn && gifts) { upgraderFreebetOn = false; renderUpgraderFreebet?.(); }
         ensureCenter();
-        if (gifts) refreshLive();
+        clearInterval(G.timer);
+        if (gifts) {
+            refreshLive();
+            // цены и котировки на сервере обновляются раз в час — подтягиваем, пока открыт режим подарков
+            G.timer = setInterval(() => { if (!document.hidden && !upg.busy) refreshLive(); }, 60000);
+        }
         paint();
         upgRefresh(true);
     }
