@@ -21,4 +21,4 @@ The connected database has no `gift_upgrade_play_gift` or `gift_upgrade_sell` im
 
 ## Repository publication
 
-Publish the approved implementation, tests, rollback, and documentation to `codex/upgrader-rigapp-comeback` and create a pull request against `main`. Production is already updated independently of merging the source PR.
+The approved implementation, tests, rollback, and documentation are published to `codex/upgrader-rigapp-comeback`: https://github.com/wxs-game/wxs-release/pull/5. Production is already updated independently of merging this source PR. No deployment or publication approval remains outstanding.
