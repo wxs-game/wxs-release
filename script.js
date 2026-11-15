@@ -4260,6 +4260,10 @@ else startApp();
     };
 
     function choose(slug) {
+        if (liveReady && liveOffers.size && !liveOffers.has(slug)) {
+            showMessage('Этот подарок сейчас недоступен для апгрейда. Выберите другой.');
+            return;
+        }
         targetSlug = slug;
         paint();
         upgRefresh(true);
@@ -4295,9 +4299,13 @@ else startApp();
         if (!t) return openDialog('catalog');
         if (!t.offer || !liveReady) { await refreshLive(); t = target(); }
         if (!t?.offer) {
-            return showMessage('Не удалось загрузить цену подарка. Попробуйте ещё раз.' + (lastErr
-                ? '\n\nСервер: ' + lastErr
-                : '\n\nДля «' + (t?.name || targetSlug) + '» сервер не выдал котировку (всего котировок: ' + liveOffers.size + ').'));
+            if (lastErr) return showMessage('Не удалось загрузить цену подарка. Попробуйте ещё раз.\n\nСервер: ' + lastErr);
+            const nm = t?.name || targetSlug;
+            targetSlug = null;           // на этот подарок сервер не даёт котировку — сбрасываем выбор
+            paint();
+            upgRefresh(true);
+            showMessage('Подарок «' + nm + '» сейчас недоступен для апгрейда. Выберите другой.');
+            return openDialog('catalog');
         }
 
         const resume = pending?.round ? pending : null;
@@ -4385,6 +4393,8 @@ else startApp();
         for (const slug of serverCatalog.keys()) if (!all.has(slug)) all.set(slug, giftBy(slug));
         for (const slug of liveOffers.keys()) if (!all.has(slug)) all.set(slug, giftBy(slug));
         let items = [...all.values()].filter((g) => centsOf(g) != null);
+        // сервер даёт котировки не на все подарки из публичных каталогов — скрываем те, на которые играть нельзя
+        if (liveReady && liveOffers.size) items = items.filter((g) => liveOffers.has(g.slug));
         const st = stakeItem();
         if (st) { const v = centsOf(st); items = items.filter((g) => centsOf(g) > v); }   // только то, что дороже твоего подарка
         return items.sort((a, b) => centsOf(a) - centsOf(b) || a.name.localeCompare(b.name));
