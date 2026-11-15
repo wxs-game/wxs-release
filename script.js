@@ -3986,7 +3986,7 @@ else startApp();
     const listed = new Map();
     let liveOffers = new Map();
     let inventory = [];
-    let liveReady = false, liveLoad = null, loadedAt = 0, catalogAsked = false, priceReq = null, rateAsked = false;
+    let lastErr = '', liveReady = false, liveLoad = null, loadedAt = 0, catalogAsked = false, priceReq = null, rateAsked = false;
     let targetSlug = null, view = 'catalog', pending = null, dollarBet = null;
     const roundKey = 'wxs-gift-round:' + (tgApp?.initDataUnsafe?.user?.id ?? 'anon');
     try { pending = JSON.parse(sessionStorage.getItem(roundKey) || 'null'); } catch { pending = null; }
@@ -4060,7 +4060,8 @@ else startApp();
                 inventory = (state.pending_gifts || []).map((g) => ({ ...giftBy(g.gift_slug), id: g.request_id, pending: true }));
                 calibrateRate();
                 liveReady = true;
-            } catch { liveReady = false; }
+                lastErr = '';
+            } catch (e) { liveReady = false; lastErr = String(e?.message || e || 'ошибка'); }
             finally { liveLoad = null; paint(); if (dlg.open) renderList(); }
         })();
         return liveLoad;
@@ -4221,7 +4222,11 @@ else startApp();
         let t = target();
         if (!t) return openDialog('catalog');
         if (!t.offer || !liveReady) { await refreshLive(); t = target(); }
-        if (!t?.offer) return showMessage('Не удалось загрузить цену подарка. Попробуйте ещё раз.');
+        if (!t?.offer) {
+            return showMessage('Не удалось загрузить цену подарка. Попробуйте ещё раз.' + (lastErr
+                ? '\n\nСервер: ' + lastErr
+                : '\n\nДля «' + (t?.name || targetSlug) + '» сервер не выдал котировку (всего котировок: ' + liveOffers.size + ').'));
+        }
 
         const round = pending?.round;
         let stake = round ? round.p_stake_cents : Math.round((parseFloat($('upgBetInput').value) || 0) * 100);
@@ -4298,7 +4303,8 @@ else startApp();
             for (const g of listed.values()) all.set(g.slug, g);
             for (const g of prices.values()) all.set(g.slug, { ...all.get(g.slug), ...g });
             for (const slug of liveOffers.keys()) if (!all.has(slug)) all.set(slug, giftBy(slug));
-            items = [...all.values()].filter((g) => usd(g) != null);
+            // когда сервер выдал котировки — в каталоге ровно те подарки, на которые можно играть
+            items = [...all.values()].filter((g) => liveReady && liveOffers.size ? liveOffers.has(g.slug) : usd(g) != null);
             items.sort((a, b) => (usd(a) ?? Infinity) - (usd(b) ?? Infinity) || a.name.localeCompare(b.name));
             sub.textContent = '';
         } else {

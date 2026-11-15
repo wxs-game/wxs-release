@@ -5902,3 +5902,8 @@ body :is(button, .pct-btn, .mines-main-btn, .copy-btn, .copy-btn-icon, .crash-fb
 #upgraderPage .wxs-seg button { padding: 10px 14px; font-size: 13px; }
 #upgraderPage .wxs-inv-btn { padding: 10px 12px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; flex: none; }
 #upgraderPage .wxs-inv-btn b { margin: 0; line-height: 1; }
+
+/* Иконка выбора подарка: никакого стекла — ни слоёв-обводок, ни подсветки */
+#upgraderPage .upg-center > .wxs-gift-pick::before,
+#upgraderPage .upg-center > .wxs-gift-pick::after { content: none !important; display: none !important; }
+#upgraderPage .upg-center > .wxs-gift-pick { background-image: none !important; overflow: visible; }
