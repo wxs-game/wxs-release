@@ -55,6 +55,7 @@ window.WXS_CONFIG = Object.freeze({
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
 
     <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="upgrader-gifts.css?v=2">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Orbitron:wght@700;900&display=swap&subset=cyrillic" rel="stylesheet">
@@ -256,6 +257,59 @@ window.WXS_CONFIG = Object.freeze({
 
 <main id="upgraderPage" class="upgrader-page hidden">
     <section class="wheel-card upg-card">
+        <div class="wxs-upg-switch" role="group" aria-label="Валюта апгрейда">
+            <button type="button" data-upg-mode="balance" aria-pressed="true">Баланс $</button>
+            <button type="button" data-upg-mode="gifts" aria-pressed="false">Подарки</button>
+        </div>
+        <section id="wxsGiftMode" class="wxs-gift-mode" hidden>
+            <div class="wxs-gift-stage upg-wheel-frame">
+                <span class="wxs-gift-demo">ДЕМОРЕЖИМ</span>
+                <button type="button" id="wxsGiftOpen" class="wxs-gift-open" aria-haspopup="dialog">
+                    <svg viewBox="0 0 96 96" aria-hidden="true">
+                        <rect x="4" y="4" width="88" height="88" rx="16" fill="none" stroke="currentColor" stroke-width="2.7" stroke-dasharray="8 7" stroke-linecap="round"/>
+                        <path d="M48 36C33 39 25 32 29 25c4-8 14-6 19 11Zm0 0c15 3 23-4 19-11-4-8-14-6-19 11Z" fill="none" stroke="currentColor" stroke-width="5.7" stroke-linejoin="round"/>
+                        <path d="M22 36h52a5 5 0 0 1 5 5v7a5 5 0 0 1-5 5H22a5 5 0 0 1-5-5v-7a5 5 0 0 1 5-5Zm0 22h52v15a8 8 0 0 1-8 8H30a8 8 0 0 1-8-8Z" fill="currentColor"/>
+                        <path d="M48 40v44" stroke="#101116" stroke-width="7" stroke-linecap="round"/>
+                    </svg>
+                    <span>Выбрать подарок</span>
+                </button>
+                <div id="wxsGiftWheel" class="wxs-gift-wheel" hidden>
+                    <div class="wxs-gift-sector"></div>
+                    <div class="wxs-gift-rotor" id="wxsGiftRotor"><i></i></div>
+                    <div class="wxs-gift-wheel-center" id="wxsGiftArt"></div>
+                </div>
+                <div id="wxsGiftTarget" class="wxs-gift-choice" hidden></div>
+            </div>
+            <div class="wxs-gift-panel">
+                <div class="wxs-gift-odds"><label for="wxsGiftChance">Шанс победы</label><strong id="wxsGiftOdds">—</strong></div>
+                <input type="range" id="wxsGiftChance" min="1" max="90" value="75" aria-label="Шанс победы" disabled>
+                <div class="wxs-gift-stake-types" role="group" aria-label="Тип ставки">
+                    <button type="button" id="wxsGiftCashType" aria-pressed="true">Демо $</button>
+                    <button type="button" id="wxsGiftItemType" aria-pressed="false">Подарок</button>
+                </div>
+                <div id="wxsGiftCash">
+                    <div class="wxs-gift-odds"><label for="wxsGiftAmount">Сумма ставки</label><span id="wxsGiftCashBalance"></span></div>
+                    <div class="wxs-gift-amount"><input type="number" id="wxsGiftAmount" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00"><span>$</span></div>
+                    <small id="wxsGiftRate">Для демо 1 GRAM = 1 демо $</small>
+                </div>
+                <button type="button" id="wxsGiftStake" class="wxs-gift-stake" aria-haspopup="dialog" hidden>Выбрать подарок из инвентаря</button>
+                <button type="button" id="wxsGiftSuggest" class="wxs-gift-stake" hidden>Ставка на 75%</button>
+                <button type="button" id="wxsGiftPlay" class="mines-main-btn" disabled>АПГРЕЙДИТЬ</button>
+                <p id="wxsGiftResult" role="status" hidden></p>
+            </div>
+            <nav class="wxs-gift-nav" aria-label="Навигация подарков">
+                <button type="button" aria-current="page" id="wxsGiftGame">↑ Апгрейдер</button>
+                <button type="button" id="wxsGiftInventory" aria-haspopup="dialog">Инвентарь <span id="wxsGiftCount">0</span></button>
+            </nav>
+            <dialog id="wxsGiftDialog" aria-labelledby="wxsGiftTitle">
+                <header><h2 id="wxsGiftTitle"></h2><button type="button" id="wxsGiftClose" aria-label="Закрыть">×</button></header>
+                <input type="search" id="wxsGiftSearch" placeholder="Поиск по названию" aria-label="Поиск по названию">
+                <p id="wxsGiftSource" hidden><a href="https://tggifts.com/floors" target="_blank" rel="noopener">TG Gifts · Fragment</a> <span id="wxsGiftPriceDate"></span> · <a href="https://t.me/GiftChangesAPI" target="_blank" rel="noopener">Изображения @GiftChangesAPI</a></p>
+                <p id="wxsGiftNotice" role="status" hidden></p>
+                <div id="wxsGiftList" class="wxs-gift-grid"></div>
+            </dialog>
+        </section>
+        <div id="wxsGiftDollar">
         <div class="upg-wheel-frame">
             <div class="upg-stage-heading"><span class="upg-live-dot" aria-hidden="true"></span><span id="upgStateLabel">ГОТОВ К АПГРЕЙДУ</span></div>
             <canvas id="upgCanvas" class="upg-canvas" aria-label="Колесо апгрейдера"></canvas>
@@ -303,6 +357,7 @@ window.WXS_CONFIG = Object.freeze({
 
             <button id="upgFreebetBtn" class="crash-fb-btn" onclick="toggleUpgraderFreebet()" hidden></button>
             <button class="mines-main-btn" id="upgPlayBtn" onclick="playUpgrader()" style="margin-top: 14px; width: 100%;">ИГРАТЬ</button>
+        </div>
         </div>
     </section>
 </main>
@@ -426,6 +481,7 @@ window.WXS_CONFIG = Object.freeze({
 
 <!-- Анимации ракеты и взрыва -->
 <script src="script.js?v=8"></script>
+<script src="upgrader-gifts.js?v=2" defer></script>
 </body>
 </html>
 
