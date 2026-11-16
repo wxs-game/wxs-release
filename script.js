@@ -3106,11 +3106,12 @@ const UPG_START = 348;       // где стрелка стоит до запус
 const UPG_SPIN = {
     windup: 9, windupT: 0.15, hold: 0.03,     // замах: градусы / секунды
     accelT: 0.5,                              // разгон до крейсерской скорости, с
-    total: 5.9,                               // от начала замаха до остановки, с
+    total: 6.6,                               // от начала замаха до остановки, с (было 5.9 — стрелка стопается дольше)
     vRef: 1150,                               // крейсерская скорость на видео, °/с
-    stopMin: 1.4, stopMax: 4.0,               // длина торможения, с (резко ... плавно)
-    pMin: 1.6, pMax: 2.6,                     // «мягкость» хвоста торможения
-    land: 0.22,                               // пауза после остановки перед результатом, с
+    stopMin: 1.9, stopMax: 5.0,               // длина торможения, с (резко ... плавно)
+    pMin: 1.9, pMax: 3.0,                     // «мягкость» хвоста торможения (больше — стрелка дольше доползает)
+    land: 0.3,                                // пауза после остановки перед результатом, с
+    tickDeg: 5, tickEvery: 5, tickGapMs: 50,  // вибрация: деление = 5°, бьём каждые 5 делений (25°), не чаще раза в 50 мс
     step: 1 / 60,                             // шаг дискретизации кейфреймов, с
     trail: [[0.010, .55], [0.021, .38], [0.032, .24], [0.044, .13]]   // [отставание с, прозрачность] призраков следа
 };
@@ -3408,14 +3409,10 @@ function upgDraw() {
 
 /* ---------- анимация вращения ---------- */
 function upgPickTarget(lo, hi) {
-    const len = hi - lo, m = Math.min(4, len * 0.35);
-    let t;
-    if (Math.random() < 0.55) {
-        const d = Math.min(m + Math.random() * 4, len / 2);
-        t = Math.random() < 0.5 ? lo + d : hi - d;
-    } else {
-        t = lo + m + Math.random() * (len - 2 * m);
-    }
+    // Равномерно по всей зоне, без подтяжки к краям (никаких «почти докатилось / почти перекатилось»).
+    // Отступ от границы оставляем, чтобы по стрелке сразу было понятно: победа или проигрыш.
+    const len = hi - lo, m = Math.min(6, len * 0.3);
+    const t = lo + m + Math.random() * (len - 2 * m);
     return ((t % 360) + 360) % 360;
 }
 
@@ -3486,6 +3483,41 @@ function upgAnimate(win, chance) {
         let done = false;
         let fallbackFrame = 0;
         let safetyTimer;
+        let hapticRaf = 0;
+        let stopFired = false;
+
+        // Вибрация «стоп» — в момент, когда стрелка остановилась (раньше, чем покажется результат)
+        const fireStop = () => {
+            if (stopFired) return;
+            stopFired = true;
+            window.haptic?.('heavy');
+        };
+        // Тики во время вращения: каждые tickEvery делений (по tickDeg градусов).
+        // Идём по тому же профилю угла, что и анимация, поэтому на торможении тики сами редеют.
+        const startHaptics = () => {
+            if (reduced) return;
+            const stepDeg = C.tickDeg * C.tickEvery;
+            const began = performance.now();
+            const clock = () => {
+                const a = upg.spinAnimation;
+                return a && typeof a.currentTime === 'number' ? a.currentTime / 1000 : (performance.now() - began) / 1000;
+            };
+            let lastIdx = Math.floor(start / stepDeg);
+            let lastAt = 0;
+            const loop = () => {
+                if (done) return;
+                const t = clock();
+                if (t >= spinSec) { fireStop(); return; }
+                const idx = Math.floor((start + prof.angle(t)) / stepDeg);
+                if (idx > lastIdx) {
+                    lastIdx = idx;
+                    const now = performance.now();
+                    if (now - lastAt >= C.tickGapMs) { lastAt = now; window.haptic?.('light'); }
+                }
+                hapticRaf = requestAnimationFrame(loop);
+            };
+            hapticRaf = requestAnimationFrame(loop);
+        };
         const stopGhosts = () => {
             for (const g of upg.ghosts || []) {
                 if (g.anim) { g.anim.cancel(); g.anim = null; }
@@ -3497,6 +3529,8 @@ function upgAnimate(win, chance) {
             done = true;
             clearTimeout(safetyTimer);
             cancelAnimationFrame(fallbackFrame);
+            cancelAnimationFrame(hapticRaf);
+            fireStop();
             upgSetRotorAngle(final);
             if (upg.spinAnimation) {
                 upg.spinAnimation.cancel();
@@ -3515,6 +3549,7 @@ function upgAnimate(win, chance) {
         // Вращение ведёт композитор браузера (WAAPI): кадры не зависят от JS и не «срываются».
         // Кривая заранее разложена на плотные линейные кейфреймы (шаг 1/60 с),
         // поэтому скорость меняется плавно, а не ступеньками.
+        startHaptics();
         if (typeof upg.rotor.animate === 'function') {
             const rot = (d) => `translateZ(0) rotate(${(start + d).toFixed(3)}deg)`;
             let frames;
