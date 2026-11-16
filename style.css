@@ -5975,3 +5975,7 @@ body :is(button, .pct-btn, .mines-main-btn, .copy-btn, .copy-btn-icon, .crash-fb
 .wxs-item-btn:disabled { opacity: .5; }
 
 .wxs-gift-card.is-unquoted { opacity: .45; filter: grayscale(.6); }
+
+#upgraderPage:not(.gift-mode) .upg-center.is-win .upg-center-caption {
+    font-size: 3.4cqw; letter-spacing: 0; color: #eac31a; font-weight: 800;
+}
