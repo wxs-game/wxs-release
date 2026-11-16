@@ -3099,8 +3099,7 @@ const UPG_MIN_CHANCE = 1;
 const UPG_MAX_CHANCE = 90;
 const UPG_STEP = 5;
 const UPG_START = 348;       // где стрелка стоит до запуска
-const UPG_WINDUP = 12;       // замах назад, градусы
-const UPG_T = { pause: 400, windup: 600, spin: 6000, land: 390 };   // мс, как в боте
+const UPG_SPIN_MS = 6000;
 const UPG_FONT = '"Carlito","Helvetica Neue",Arial,sans-serif';
 
 const upg = { chance: 40, busy: false, result: null, fade: 1, theta: UPG_START, glow: 0, scenes: {}, cv: null, ctx: null, size: 0, raf: 0, fadeRaf: 0 };
@@ -3383,8 +3382,8 @@ function upgDraw() {
             ? upg.resultPayout : (upgraderFreebetOn ? roundMoney(gross - bet) : gross);
         const outcome = upg.result;
         upg.centerValue.textContent = outcome === 'win' ? 'ПОБЕДА' : outcome === 'lose' ? 'МИМО' : `${disp}%`;
-        upg.centerCoef.textContent = outcome === 'win' ? `+${payout.toFixed(2)} $` : `x${upgCalc(bet, chance).coef.toFixed(2)}`;
-        upg.centerCaption.textContent = outcome === 'win' ? 'ЗАЧИСЛЕНО НА БАЛАНС' : outcome === 'lose' ? 'ПОПРОБУЙ ЕЩЁ' : 'ШАНС ПОБЕДЫ';
+        upg.centerCoef.textContent = `×${upgCalc(bet, chance).coef.toFixed(2)}`;
+        upg.centerCaption.textContent = outcome === 'win' ? `+${payout.toFixed(2)}$` : outcome === 'lose' ? 'ПОПРОБУЙ ЕЩЁ' : 'ШАНС ПОБЕДЫ';
         upg.center.classList.toggle('is-result', !!outcome);
         upg.center.classList.toggle('is-win', outcome === 'win');
         if (window.WXG?.on) WXG.center(outcome);
@@ -3421,10 +3420,11 @@ function upgAnimate(win, chance) {
     const target = upgPickTarget(lo, hi);
     const final = start + 1440 + ((target - start + 360) % 360);
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const { pause, windup, spin, land } = reduced
-        ? { pause: 0, windup: 0, spin: 220, land: 80 } : UPG_T;
-    const total = pause + windup + spin + land;
-    const spinStart = pause + windup;
+    const total = reduced ? 300 : UPG_SPIN_MS;
+    // Integrate t * (1-t)^braking: continuous forward motion with zero
+    // speed at both ends. Lower powers brake later and more sharply.
+    const braking = Math.random() < 0.5 ? 0.75 : 2.5;
+    const progress = t => 1 - Math.pow(1 - t, braking + 1) * (1 + (braking + 1) * t);
     upg.shown = chance;
     upg.betC = null;
     upg.result = null;
@@ -3462,16 +3462,12 @@ function upgAnimate(win, chance) {
         // No canvas painting, text measurement or layout reads during the spin.
         if (typeof upg.rotor.animate === 'function') {
             const rotation = value => `translateZ(0) rotate(${value}deg)`;
-            const frames = reduced ? [
-                { transform: rotation(start) }, { transform: rotation(final) }
-            ] : [
-                { transform: rotation(start), offset: 0 },
-                { transform: rotation(start), offset: pause / total, easing: 'ease-in-out' },
-                { transform: rotation(start - UPG_WINDUP), offset: spinStart / total,
-                    easing: 'cubic-bezier(.12,.72,.16,1)' },
-                { transform: rotation(final), offset: (spinStart + spin) / total },
-                { transform: rotation(final), offset: 1 }
-            ];
+            // Sample the same curve used by the fallback; linear interpolation
+            // avoids a different braking profile on older Telegram webviews.
+            const frames = Array.from({ length: 361 }, (_, i) => {
+                const t = i / 360;
+                return { transform: rotation(start + (final - start) * progress(t)), offset: t };
+            });
             try {
                 upg.spinAnimation = upg.rotor.animate(frames, { duration: total, fill: 'forwards' });
                 upg.spinAnimation.finished.then(finish, finish);
@@ -3487,15 +3483,8 @@ function upgAnimate(win, chance) {
             const step = now => {
                 if (done) return;
                 const elapsed = now - began;
-                let angle = start;
-                if (elapsed >= spinStart) {
-                    const k = Math.max(0, Math.min(1, (elapsed - spinStart) / spin));
-                    const origin = reduced ? start : start - UPG_WINDUP;
-                    angle = origin + (final - origin) * (1 - Math.pow(1 - k, 3));
-                } else if (elapsed > pause && windup) {
-                    angle -= UPG_WINDUP * upgSmooth((elapsed - pause) / windup);
-                }
-                upgSetRotorAngle(angle);
+                const t = Math.max(0, Math.min(1, elapsed / total));
+                upgSetRotorAngle(start + (final - start) * progress(t));
                 if (elapsed >= total) finish(); else fallbackFrame = requestAnimationFrame(step);
             };
             fallbackFrame = requestAnimationFrame(step);
