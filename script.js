@@ -3099,7 +3099,21 @@ const UPG_MIN_CHANCE = 1;
 const UPG_MAX_CHANCE = 90;
 const UPG_STEP = 5;
 const UPG_START = 348;       // где стрелка стоит до запуска
-const UPG_SPIN_MS = 6000;
+// Профиль вращения снят покадрово (60 fps) с видео-образца:
+//   замах назад ≈9° за 0.15 с -> разгон 0.5 с до ≈1150°/с -> ровное вращение -> торможение v ~ (1-s)^p.
+//   Всё вращение ≈5.9 с. Торможение каждый раз разное: от резкого (≈1.4 с, p≈1.6)
+//   до плавного «как на видео» (4.0 с, p≈2.6).
+const UPG_SPIN = {
+    windup: 9, windupT: 0.15, hold: 0.03,     // замах: градусы / секунды
+    accelT: 0.5,                              // разгон до крейсерской скорости, с
+    total: 5.9,                               // от начала замаха до остановки, с
+    vRef: 1150,                               // крейсерская скорость на видео, °/с
+    stopMin: 1.4, stopMax: 4.0,               // длина торможения, с (резко ... плавно)
+    pMin: 1.6, pMax: 2.6,                     // «мягкость» хвоста торможения
+    land: 0.22,                               // пауза после остановки перед результатом, с
+    step: 1 / 60,                             // шаг дискретизации кейфреймов, с
+    trail: [[0.010, .55], [0.021, .38], [0.032, .24], [0.044, .13]]   // [отставание с, прозрачность] призраков следа
+};
 const UPG_FONT = '"Carlito","Helvetica Neue",Arial,sans-serif';
 
 const upg = { chance: 40, busy: false, result: null, fade: 1, theta: UPG_START, glow: 0, scenes: {}, cv: null, ctx: null, size: 0, raf: 0, fadeRaf: 0 };
@@ -3382,8 +3396,8 @@ function upgDraw() {
             ? upg.resultPayout : (upgraderFreebetOn ? roundMoney(gross - bet) : gross);
         const outcome = upg.result;
         upg.centerValue.textContent = outcome === 'win' ? 'ПОБЕДА' : outcome === 'lose' ? 'МИМО' : `${disp}%`;
-        upg.centerCoef.textContent = `×${upgCalc(bet, chance).coef.toFixed(2)}`;
-        upg.centerCaption.textContent = outcome === 'win' ? `+${payout.toFixed(2)}$` : outcome === 'lose' ? 'ПОПРОБУЙ ЕЩЁ' : 'ШАНС ПОБЕДЫ';
+        upg.centerCoef.textContent = outcome === 'win' ? `+${payout.toFixed(2)} $` : `x${upgCalc(bet, chance).coef.toFixed(2)}`;
+        upg.centerCaption.textContent = outcome === 'win' ? 'ЗАЧИСЛЕНО НА БАЛАНС' : outcome === 'lose' ? 'ПОПРОБУЙ ЕЩЁ' : 'ШАНС ПОБЕДЫ';
         upg.center.classList.toggle('is-result', !!outcome);
         upg.center.classList.toggle('is-win', outcome === 'win');
         if (window.WXG?.on) WXG.center(outcome);
@@ -3410,6 +3424,39 @@ function upgSetRotorAngle(degrees) {
     if (upg.rotor) upg.rotor.style.transform = `translateZ(0) rotate(${degrees}deg)`;
 }
 
+// Профиль вращения: угол (градусы от стартовой позиции) в момент t (секунды от начала замаха).
+// Скорость везде непрерывна -> никаких рывков: замах -> smoothstep-разгон -> ровно -> (1-s)^p до нуля.
+function upgBuildProfile(rem) {
+    const C = UPG_SPIN, W = C.windup, k = Math.random();
+    const Ta = C.accelT, t0 = C.windupT + C.hold;
+    const Td = C.stopMin + k * (C.stopMax - C.stopMin);           // резко ... плавно
+    const p = C.pMin + k * (C.pMax - C.pMin) + (Math.random() - .5) * .3;
+    const Tc = Math.max(.2, C.total - t0 - Ta - Td);              // ровное вращение добирает до ≈5.9 с
+    const eff = Ta / 2 + Tc + Td / (p + 1);                       // «эффективное» время на vmax
+    const n = Math.max(3, Math.round((C.vRef * eff - W - rem) / 360));   // целых оборотов
+    const delta = n * 360 + rem;                                  // итоговый поворот от старта
+    const vmax = (delta + W) / eff;
+    const tA = t0, tC = tA + Ta, tD = tC + Tc, tEnd = tD + Td;
+    const sm = (x) => x * x * (3 - 2 * x);
+    const a1 = -W + vmax * Ta / 2;
+    const angle = (t) => {
+        if (t <= 0) return 0;
+        if (t < C.windupT) return -W * sm(t / C.windupT);
+        if (t < tA) return -W;
+        if (t < tC) { const x = (t - tA) / Ta; return -W + vmax * Ta * (x * x * x - x * x * x * x / 2); }
+        if (t < tD) return a1 + vmax * (t - tC);
+        if (t < tEnd) { const s = (t - tD) / Td; return a1 + vmax * Tc + vmax * Td * (1 - Math.pow(1 - s, p + 1)) / (p + 1); }
+        return delta;
+    };
+    const speed = (t) => {                                        // °/с — для яркости следа
+        if (t <= tA || t >= tEnd) return 0;
+        if (t < tC) return vmax * sm((t - tA) / Ta);
+        if (t < tD) return vmax;
+        return vmax * Math.pow(1 - (t - tD) / Td, p);
+    };
+    return { angle, speed, delta, end: tEnd, vmax, stop: Td, p };
+}
+
 function upgAnimate(win, chance) {
     cancelAnimationFrame(upg.fadeRaf);
     cancelAnimationFrame(upg.chRaf);
@@ -3418,13 +3465,13 @@ function upgAnimate(win, chance) {
     const [lo, hi] = win ? [180 - half, 180 + half] : [180 + half, 540 - half];
     const start = ((upg.theta % 360) + 360) % 360;
     const target = upgPickTarget(lo, hi);
-    const final = start + 1440 + ((target - start + 360) % 360);
+    const rem = (target - start + 360) % 360;
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const total = reduced ? 300 : UPG_SPIN_MS;
-    // Integrate t * (1-t)^braking: continuous forward motion with zero
-    // speed at both ends. Lower powers brake later and more sharply.
-    const braking = Math.random() < 0.5 ? 0.75 : 2.5;
-    const progress = t => 1 - Math.pow(1 - t, braking + 1) * (1 + (braking + 1) * t);
+    const C = UPG_SPIN;
+    const prof = upgBuildProfile(rem);
+    const final = start + prof.delta;
+    const spinSec = reduced ? 0.3 : prof.end;
+    const totalMs = Math.round((spinSec + (reduced ? .08 : C.land)) * 1000);
     upg.shown = chance;
     upg.betC = null;
     upg.result = null;
@@ -3439,6 +3486,12 @@ function upgAnimate(win, chance) {
         let done = false;
         let fallbackFrame = 0;
         let safetyTimer;
+        const stopGhosts = () => {
+            for (const g of upg.ghosts || []) {
+                if (g.anim) { g.anim.cancel(); g.anim = null; }
+                g.el.style.opacity = '0';
+            }
+        };
         const finish = () => {
             if (done) return;
             done = true;
@@ -3449,6 +3502,7 @@ function upgAnimate(win, chance) {
                 upg.spinAnimation.cancel();
                 upg.spinAnimation = null;
             }
+            stopGhosts();
             upg.result = win ? 'win' : 'lose';
             if (!win) upgPaintLose(chance);
             upg.glow = win ? 1 : 0;
@@ -3458,19 +3512,40 @@ function upgAnimate(win, chance) {
             resolve();
         };
 
-        // The browser compositor drives rotation at the display's refresh rate.
-        // No canvas painting, text measurement or layout reads during the spin.
+        // Вращение ведёт композитор браузера (WAAPI): кадры не зависят от JS и не «срываются».
+        // Кривая заранее разложена на плотные линейные кейфреймы (шаг 1/60 с),
+        // поэтому скорость меняется плавно, а не ступеньками.
         if (typeof upg.rotor.animate === 'function') {
-            const rotation = value => `translateZ(0) rotate(${value}deg)`;
-            // Sample the same curve used by the fallback; linear interpolation
-            // avoids a different braking profile on older Telegram webviews.
-            const frames = Array.from({ length: 361 }, (_, i) => {
-                const t = i / 360;
-                return { transform: rotation(start + (final - start) * progress(t)), offset: t };
-            });
+            const rot = (d) => `translateZ(0) rotate(${(start + d).toFixed(3)}deg)`;
+            let frames;
+            if (reduced) {
+                frames = [{ transform: rot(0), offset: 0 }, { transform: rot(prof.delta), offset: 1 }];
+            } else {
+                frames = [];
+                const stepN = Math.ceil(spinSec / C.step);
+                for (let i = 0; i <= stepN; i++) {
+                    const t = Math.min(spinSec, i * C.step);
+                    frames.push({ transform: rot(prof.angle(t)), offset: t / (totalMs / 1000) });
+                }
+                frames.push({ transform: rot(prof.delta), offset: 1 });
+            }
             try {
-                upg.spinAnimation = upg.rotor.animate(frames, { duration: total, fill: 'forwards' });
+                upg.spinAnimation = upg.rotor.animate(frames, { duration: totalMs, fill: 'forwards', easing: 'linear' });
                 upg.spinAnimation.finished.then(finish, finish);
+                // След из «призраков» стрелки: те же кейфреймы, только с отставанием по времени.
+                // Чем быстрее вращение — тем длиннее и ярче след; при медленном торможении он сам сливается со стрелкой.
+                if (!reduced) {
+                    (upg.ghosts || []).forEach((g, gi) => {
+                        const [lag, alpha] = C.trail[gi];
+                        const gf = frames.map((f) => {
+                            const t = f.offset * totalMs / 1000;
+                            const v = prof.speed(Math.max(0, t - lag));
+                            return { transform: f.transform, opacity: +(alpha * Math.min(1, v / 520)).toFixed(3), offset: f.offset };
+                        });
+                        try { g.anim = g.el.animate(gf, { duration: totalMs, delay: lag * 1000, fill: 'both', easing: 'linear' }); }
+                        catch (_) { g.anim = null; }
+                    });
+                }
             } catch (_) {
                 startFallback();
             }
@@ -3482,14 +3557,13 @@ function upgAnimate(win, chance) {
             const began = performance.now();
             const step = now => {
                 if (done) return;
-                const elapsed = now - began;
-                const t = Math.max(0, Math.min(1, elapsed / total));
-                upgSetRotorAngle(start + (final - start) * progress(t));
-                if (elapsed >= total) finish(); else fallbackFrame = requestAnimationFrame(step);
+                const t = (now - began) / 1000;
+                upgSetRotorAngle(reduced ? start + prof.delta * Math.min(1, t / .3) : start + prof.angle(t));
+                if (t * 1000 >= totalMs) finish(); else fallbackFrame = requestAnimationFrame(step);
             };
             fallbackFrame = requestAnimationFrame(step);
         }
-        safetyTimer = setTimeout(finish, total + 500);
+        safetyTimer = setTimeout(finish, totalMs + 500);
     });
 }
 
@@ -3554,7 +3628,18 @@ function upgInit() {
     const rotor = document.createElement('div');
     rotor.className = 'upg-rotor';
     rotor.setAttribute('aria-hidden','true');
-    rotor.innerHTML = `<svg viewBox="0 0 720 720"><defs><linearGradient id="upg-arrow-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe45a"/><stop offset=".55" stop-color="#ffcf1a"/><stop offset="1" stop-color="#ffc000"/></linearGradient></defs><g transform="translate(360 151) scale(.225) rotate(12.9) translate(-358 -570)"><path d="M130 277 262 250 362 568Z" fill="#a67c10" fill-opacity=".55"/><path d="M433 205 346 232 358 570Z" fill="#a67c10" fill-opacity=".5"/><path d="M243 68 312 277 353 226 358 572 207 257 268 283Z" fill="url(#upg-arrow-gold)"/><path d="M312 277 353 226 358 572 318 330Z" fill="#f2b300"/><path d="M244 70 276 270 358 570 320 330Z" fill="#fff6ae" fill-opacity=".85"/></g></svg>`;
+    const arrowSvg = (sfx) => `<svg viewBox="0 0 720 720"><defs><linearGradient id="upg-arrow-gold${sfx}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe45a"/><stop offset=".55" stop-color="#ffcf1a"/><stop offset="1" stop-color="#ffc000"/></linearGradient></defs><g transform="translate(360 151) scale(.225) rotate(12.9) translate(-358 -570)"><path d="M130 277 262 250 362 568Z" fill="#a67c10" fill-opacity=".55"/><path d="M433 205 346 232 358 570Z" fill="#a67c10" fill-opacity=".5"/><path d="M243 68 312 277 353 226 358 572 207 257 268 283Z" fill="url(#upg-arrow-gold${sfx})"/><path d="M312 277 353 226 358 572 318 330Z" fill="#f2b300"/><path d="M244 70 276 270 358 570 320 330Z" fill="#fff6ae" fill-opacity=".85"/></g></svg>`;
+    rotor.innerHTML = arrowSvg('');
+    // призраки стрелки для следа при вращении: лежат под основной стрелкой, без тяжёлого drop-shadow
+    upg.ghosts = UPG_SPIN.trail.map((_, gi) => {
+        const el = document.createElement('div');
+        el.className = 'upg-rotor upg-ghost';
+        el.setAttribute('aria-hidden', 'true');
+        el.style.opacity = '0';
+        el.innerHTML = arrowSvg('-g' + gi);
+        stack.appendChild(el);
+        return { el, anim: null };
+    });
     stack.appendChild(rotor);
     upg.rotor = rotor;
     if (typeof ResizeObserver !== 'undefined') {
