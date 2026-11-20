@@ -8,6 +8,7 @@ const deviceStorageKey = "wxs.verification.device";
 const params = new URLSearchParams(location.search);
 const next = params.get("next") || "";
 const resumeUntil = Number(params.get("resume_until"));
+const resultDisplayMs = 3000;
 const returnUrl = /^(?:ac_[A-Za-z0-9]{8}|crash|upgrader)$/.test(next) ? botUrl + "?start=" + next : botUrl + "?start=antitwink";
 const button = document.getElementById("action");
 const settings = document.getElementById("settings");
@@ -28,21 +29,31 @@ function openBot() {
   location.assign(returnUrl);
 }
 
-function autoReturnAvailable() {
+function autoReturnAvailable(status) {
   return typeof telegram?.close === "function" && Number.isSafeInteger(resumeUntil)
-    && Date.now() < resumeUntil * 1000;
+    && Date.now() + 12000 < resumeUntil * 1000
+    && (status === "approved" || params.get("resume_blocked") === "1");
 }
 
-function returnAfterVerification() {
-  if (!autoReturnAvailable()) return;
-  description.textContent = "Проверка пройдена. Бот продолжит вход в чате.";
+function returnAfterVerification(status) {
+  const autoReturn = autoReturnAvailable(status);
+  const detail = description.textContent;
+  const label = button.textContent;
+  button.disabled = true;
+  if (autoReturn) {
+    button.textContent = "Возвращаемся в бот…";
+    if (status === "approved") description.textContent = "Проверка пройдена. Бот продолжит вход в чате.";
+  }
   setTimeout(() => {
+    button.disabled = false;
+    button.textContent = label;
+    if (!autoReturn) return;
     try {
       telegram.close();
     } catch {
-      description.textContent = "Проверка пройдена. Вернитесь в бот, чтобы продолжить.";
+      description.textContent = detail;
     }
-  }, 250);
+  }, resultDisplayMs);
 }
 
 function show(state, message = "") {
@@ -57,7 +68,7 @@ function show(state, message = "") {
   hero.src = state === "approved" ? "approved.webp" : state === "blocked" ? "lock.webp" : "shield.webp";
   const views = {
     required: ["Проверка аккаунта", "Подтвердите устройство и примерную локацию, чтобы открыть доступ к WXS GAME.", message ? "Попробовать ещё раз" : "Разрешить и проверить", submit],
-    checking: ["Проверка аккаунта", "Подтвердите запрос на доступ к локации в Telegram.", "Идёт проверка…", submit],
+    checking: ["Проверка аккаунта", "Проверяем данные входа, устройство и примерную локацию. Если Telegram запросит геолокацию, разрешите доступ.", "Идёт проверка…", submit],
     loading: ["Проверка аккаунта", "Получаем статус проверки в WXS GAME.", "Проверяем доступ…", lookup],
     approved: ["Доступ открыт", "Проверка пройдена. Вернитесь в бот, чтобы продолжить.", "Продолжить в боте", openBot],
     blocked: ["Доступ закрыт", "Обнаружена связь с другими аккаунтами. Пополнения, выводы, чеки, дуэли и игры недоступны.", "Вернуться в бот", openBot],
@@ -79,7 +90,7 @@ function showResult(result) {
   }
   show(result.status);
   if (result.status === "approved") {
-    returnAfterVerification();
+    returnAfterVerification(result.status);
     return;
   }
   if (result.status !== "blocked") return;
@@ -96,6 +107,7 @@ function showResult(result) {
     linked.append(row);
   }
   linked.hidden = !linked.childElementCount;
+  returnAfterVerification(result.status);
 }
 
 async function request(body = {}) {
@@ -127,7 +139,12 @@ async function lookup() {
   }
   show("loading");
   try {
-    showResult(await request());
+    const result = await request();
+    if (result.status === "required") {
+      await submit();
+    } else {
+      showResult(result);
+    }
   } catch (error) {
     show(error.sessionExpired ? "expired" : "error");
   }
@@ -217,7 +234,6 @@ async function submit() {
   try {
     const result = await request({ p_device: marker, p_location: cell });
     showResult(result);
-    if (result.status === "approved") telegram.HapticFeedback?.notificationOccurred("success");
   } catch (error) {
     show(error.sessionExpired ? "expired" : "error");
   }
