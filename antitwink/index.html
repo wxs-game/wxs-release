@@ -8,7 +8,7 @@
   <title>Проверка аккаунта · WXS GAME</title>
   <link rel="stylesheet" href="./style.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="./verify.js?v=3" defer></script>
+  <script src="./verify.js?v=4" defer></script>
 </head>
 <body>
   <div class="shell">
@@ -17,20 +17,19 @@
       <div class="hero" aria-hidden="true"><div class="hero-ring"></div><div class="hero-core"><img id="hero-icon" src="shield.webp" alt="" width="64" height="64"></div></div>
       <section class="copy" aria-live="polite">
         <h1 id="title">Проверка аккаунта</h1>
-        <p id="description">Подтвердите устройство и примерную локацию, чтобы открыть доступ к WXS GAME.</p>
+        <p id="description">Проверяем данные входа, сеть и устройство.</p>
         <div class="signals" id="signals">
           <div><img src="device.webp" alt="" width="24" height="24"><span>Устройство</span></div>
-          <div><img src="globe.webp" alt="" width="24" height="24"><span>Локация</span></div>
+          <div><img src="globe.webp" alt="" width="24" height="24"><span>Сеть</span></div>
         </div>
         <ul id="linked" class="linked" aria-label="Связанные аккаунты" hidden></ul>
         <p class="message" id="message" hidden></p>
       </section>
       <div class="actions">
         <button id="action" class="primary" type="button" disabled><span>Проверяем доступ…</span></button>
-        <button id="settings" class="secondary" type="button" hidden>Открыть настройки Telegram</button>
       </div>
     </main>
-    <footer id="privacy">Точные координаты не передаются на сервер.</footer>
+    <footer id="privacy">Для сверки сохраняется хеш IP-адреса.</footer>
   </div>
 </body>
 </html>

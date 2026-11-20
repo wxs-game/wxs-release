@@ -24,7 +24,7 @@
 
       if (status === "required") {
         heading.textContent = "Сначала пройдите проверку";
-        body.textContent = "Откройте WXS GAME в Telegram и подтвердите устройство и примерную локацию.";
+        body.textContent = "Откройте WXS GAME в Telegram для автоматической проверки сети и устройства.";
       } else if (status === "blocked") {
         heading.textContent = "Доступ закрыт";
         const names = linked.slice(0, 5).map((peer) => peer.username ? "@" + peer.username : "ID " + peer.id);

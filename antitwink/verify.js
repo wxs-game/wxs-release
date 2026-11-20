@@ -11,7 +11,6 @@ const resumeUntil = Number(params.get("resume_until"));
 const resultDisplayMs = 3000;
 const returnUrl = /^(?:ac_[A-Za-z0-9]{8}|crash|upgrader)$/.test(next) ? botUrl + "?start=" + next : botUrl + "?start=antitwink";
 const button = document.getElementById("action");
-const settings = document.getElementById("settings");
 const description = document.getElementById("description");
 const title = document.getElementById("title");
 const hero = document.getElementById("hero-icon");
@@ -63,12 +62,11 @@ function show(state, message = "") {
   linked.hidden = true;
   signals.hidden = state !== "required" && state !== "checking";
   privacy.hidden = signals.hidden;
-  settings.hidden = !(state === "required" && message && telegram?.LocationManager?.isLocationAvailable);
   button.disabled = state === "checking" || state === "loading";
   hero.src = state === "approved" ? "approved.webp" : state === "blocked" ? "lock.webp" : "shield.webp";
   const views = {
-    required: ["Проверка аккаунта", "Подтвердите устройство и примерную локацию, чтобы открыть доступ к WXS GAME.", message ? "Попробовать ещё раз" : "Разрешить и проверить", submit],
-    checking: ["Проверка аккаунта", "Проверяем данные входа, устройство и примерную локацию. Если Telegram запросит геолокацию, разрешите доступ.", "Идёт проверка…", submit],
+    required: ["Проверка аккаунта", "Проверяем данные входа, сеть и устройство.", "Попробовать ещё раз", submit],
+    checking: ["Проверка аккаунта", "Проверяем данные входа, сеть и устройство.", "Идёт проверка…", submit],
     loading: ["Проверка аккаунта", "Получаем статус проверки в WXS GAME.", "Проверяем доступ…", lookup],
     approved: ["Доступ открыт", "Проверка пройдена. Вернитесь в бот, чтобы продолжить.", "Продолжить в боте", openBot],
     blocked: ["Доступ закрыт", "Обнаружена связь с другими аккаунтами. Пополнения, выводы, чеки, дуэли и игры недоступны.", "Вернуться в бот", openBot],
@@ -150,39 +148,14 @@ async function lookup() {
   }
 }
 
-function within(start, timeout = 30000) {
+function within(start, timeout) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("Location timeout")), timeout);
-    start((value) => {
+    const timer = setTimeout(() => reject(new Error("Device information timed out")), timeout);
+    start(() => {
       clearTimeout(timer);
-      value ? resolve(value) : reject(new Error("Location unavailable"));
+      resolve();
     });
   });
-}
-
-async function getLocation() {
-  const manager = telegram?.LocationManager;
-  if (manager && telegram.isVersionAtLeast("8.0")) {
-    try {
-      if (!manager.isInited) await within((done) => manager.init(() => done(true)), 2500);
-    } catch {
-      // Older Telegram builds can leave the LocationManager callback unanswered.
-    }
-    if (manager.isLocationAvailable) return within((done) => manager.getLocation(done));
-  }
-  if (!navigator.geolocation) throw new Error("Location unavailable");
-  return within((done) => navigator.geolocation.getCurrentPosition(
-    ({ coords }) => done(coords), () => done(null), { timeout: 15000, maximumAge: 60000 }
-  ), 16000);
-}
-
-function locationCell({ latitude, longitude }) {
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
-    throw new Error("Invalid location");
-  }
-  const latCell = Math.min(8999, Math.floor((latitude + 90) * 50));
-  const lonCell = Math.min(17999, Math.floor((longitude + 180) * 50));
-  return latCell + ":" + lonCell;
 }
 
 function localDeviceMarker() {
@@ -202,7 +175,7 @@ async function deviceMarker() {
   const manager = telegram?.BiometricManager;
   if (manager && telegram.isVersionAtLeast("7.2")) {
     try {
-      if (!manager.isInited) await within((done) => manager.init(() => done(true)), 2000);
+      if (!manager.isInited) await within((done) => manager.init(done), 2000);
       const id = manager.deviceId || "";
       if (manager.isBiometricAvailable && /^[a-zA-Z0-9_:-]{12,200}$/.test(id)) {
         const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("wxs-device:" + id));
@@ -217,13 +190,6 @@ async function deviceMarker() {
 
 async function submit() {
   show("checking");
-  let cell;
-  try {
-    cell = locationCell(await getLocation());
-  } catch {
-    show("required", "Разрешите доступ к локации в Telegram или браузере и повторите проверку.");
-    return;
-  }
   let marker;
   try {
     marker = await deviceMarker();
@@ -232,7 +198,7 @@ async function submit() {
     return;
   }
   try {
-    const result = await request({ p_device: marker, p_location: cell });
+    const result = await request({ p_device: marker });
     showResult(result);
   } catch (error) {
     show(error.sessionExpired ? "expired" : "error");
@@ -240,7 +206,6 @@ async function submit() {
 }
 
 button.addEventListener("click", () => action());
-settings.addEventListener("click", () => telegram?.LocationManager?.openSettings());
 telegram?.ready();
 telegram?.expand();
 if (telegram?.isVersionAtLeast?.("6.9")) {

@@ -103,7 +103,6 @@ button { min-height: 3.35rem; font: inherit; font-weight: 750; border-radius: .9
 .primary { width: 100%; padding: .65rem 1rem; border: 0; color: var(--ink); background: var(--accent); }
 .primary:disabled { opacity: .56; cursor: wait; }
 .primary:not(:disabled):hover { filter: brightness(1.08); }
-.secondary { border: 1px solid var(--line); background: transparent; color: var(--text); }
 button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 .message { padding: .72rem .8rem; border: 1px solid var(--ring); border-radius: .8rem; }
 footer { color: var(--muted); font-size: .825rem; text-align: center; line-height: 1.35; }
