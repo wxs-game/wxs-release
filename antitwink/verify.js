@@ -72,6 +72,7 @@ function show(state, message = "") {
     blocked: ["Доступ закрыт", "Обнаружена связь с другими аккаунтами. Пополнения, выводы, чеки, дуэли и игры недоступны.", "Вернуться в бот", openBot],
     outside: ["Откройте в Telegram", "Запустите проверку из личного чата с WXS GAME.", "Открыть WXS GAME", openBot],
     expired: ["Сессия завершилась", "Откройте проверку заново из личного чата с WXS GAME.", "Вернуться в бот", openBot],
+    network_unavailable: ["Не удалось проверить сеть", "Сервис временно не получил IP-адрес. Попробуйте повторить проверку.", "Повторить проверку", lookup],
     error: ["Проверка недоступна", "Попробуйте ещё раз через несколько секунд.", "Проверить ещё раз", lookup],
   };
   const [heading, detail, label, callback] = views[state];
@@ -82,6 +83,10 @@ function show(state, message = "") {
 }
 
 function showResult(result) {
+  if (result.status === "network_unavailable") {
+    show(result.status);
+    return;
+  }
   if (!["approved", "required", "blocked"].includes(result.status)) {
     show("error");
     return;
