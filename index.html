@@ -51,33 +51,8 @@ window.WXS_CONFIG = Object.freeze({
     <title>WXS</title>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>html.wxs-access-pending body,html.wxs-access-denied body{visibility:hidden!important}html.wxs-access-denied{background:#090909!important}</style>
-    <script>
-    (() => {
-        const webApp = window.Telegram?.WebApp;
-        const initData = webApp?.initData || '';
-        if (!window.WXS_ROUTE || !initData) return;
-        const root = document.documentElement;
-        const namedBlock = webApp.initDataUnsafe?.user?.username?.toLowerCase() === 'svolk';
-        root.classList.add(namedBlock ? 'wxs-access-denied' : 'wxs-access-pending');
-        if (namedBlock) document.title = '';
-        const api = window.WXS_CONFIG;
-        window.WXS_APP_ACCESS = fetch(api.supabaseUrl + '/rest/v1/rpc/wxs_app_access', {
-            method: 'POST',
-            headers: { apikey: api.supabaseKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_init: initData }),
-            signal: AbortSignal.timeout(5500)
-        }).then(async (response) => {
-            const blocked = response.ok && await response.json() === false;
-            if (blocked || namedBlock) {
-                root.classList.add('wxs-access-denied');
-                document.title = '';
-                return false;
-            }
-            return response.ok;
-        }).catch(() => false).finally(() => root.classList.remove('wxs-access-pending'));
-    })();
-    </script>
+    <link rel="stylesheet" href="antitwink/game-gate.css">
+    <script src="antitwink/game-gate.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
 
