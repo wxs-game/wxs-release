@@ -5,7 +5,9 @@ const endpoint = "https://nkovsjhwinbbapsqvpnu.supabase.co/rest/v1/rpc/wxs_antit
 const publicKey = "sb_publishable_GVUZWdR9qVSHwL7aL63W8w_g7rtfJkN";
 const botUrl = "https://t.me/wxsgame";
 const deviceStorageKey = "wxs.verification.device";
-const next = new URLSearchParams(location.search).get("next") || "";
+const params = new URLSearchParams(location.search);
+const next = params.get("next") || "";
+const resumeUntil = Number(params.get("resume_until"));
 const returnUrl = /^(?:ac_[A-Za-z0-9]{8}|crash|upgrader)$/.test(next) ? botUrl + "?start=" + next : botUrl + "?start=antitwink";
 const button = document.getElementById("action");
 const settings = document.getElementById("settings");
@@ -24,6 +26,23 @@ function openBot() {
     return;
   }
   location.assign(returnUrl);
+}
+
+function autoReturnAvailable() {
+  return typeof telegram?.close === "function" && Number.isSafeInteger(resumeUntil)
+    && Date.now() < resumeUntil * 1000;
+}
+
+function returnAfterVerification() {
+  if (!autoReturnAvailable()) return;
+  description.textContent = "Проверка пройдена. Бот продолжит вход в чате.";
+  setTimeout(() => {
+    try {
+      telegram.close();
+    } catch {
+      description.textContent = "Проверка пройдена. Вернитесь в бот, чтобы продолжить.";
+    }
+  }, 250);
 }
 
 function show(state, message = "") {
@@ -59,6 +78,10 @@ function showResult(result) {
     return;
   }
   show(result.status);
+  if (result.status === "approved") {
+    returnAfterVerification();
+    return;
+  }
   if (result.status !== "blocked") return;
   linked.replaceChildren();
   for (const peer of result.linked || []) {
