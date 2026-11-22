@@ -63,7 +63,7 @@ function show(state, message = "") {
   signals.hidden = state !== "required" && state !== "checking";
   privacy.hidden = signals.hidden;
   button.disabled = state === "checking" || state === "loading";
-  hero.src = state === "approved" ? "../assets/antitwink/approved.webp" : state === "blocked" ? "../assets/antitwink/lock.webp" : "../assets/antitwink/shield.webp";
+  hero.src = state === "approved" ? "approved.webp" : state === "blocked" ? "lock.webp" : "shield.webp";
   const views = {
     required: ["Проверка аккаунта", "Проверяем данные входа, сеть и устройство.", "Попробовать ещё раз", submit],
     checking: ["Проверка аккаунта", "Проверяем данные входа, сеть и устройство.", "Идёт проверка…", submit],
@@ -101,7 +101,7 @@ function showResult(result) {
   for (const peer of result.linked || []) {
     const row = document.createElement("li");
     const icon = document.createElement("img");
-    icon.src = "../assets/antitwink/profile.webp";
+    icon.src = "profile.webp";
     icon.alt = "";
     icon.width = icon.height = 24;
     const name = document.createElement("span");

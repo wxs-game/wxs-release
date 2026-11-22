@@ -15,7 +15,7 @@
       panel.setAttribute("aria-live", "polite");
       const card = document.createElement("div");
       const image = document.createElement("img");
-      image.src = status === "blocked" ? "assets/antitwink/lock.webp" : "assets/antitwink/shield.webp";
+      image.src = status === "blocked" ? "antitwink/lock.webp" : "antitwink/shield.webp";
       image.alt = "";
       image.width = image.height = 60;
       const heading = document.createElement("h1");
