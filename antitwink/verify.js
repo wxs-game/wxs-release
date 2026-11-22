@@ -143,7 +143,7 @@ async function lookup() {
   show("loading");
   try {
     const result = await request();
-    if (result.status === "required") {
+    if (result.status === "required" || (result.status === "approved" && result.device_check !== false)) {
       await submit();
     } else {
       showResult(result);
@@ -176,13 +176,13 @@ function localDeviceMarker() {
   return navigator.locks ? navigator.locks.request(deviceStorageKey, getOrCreate) : getOrCreate();
 }
 
-async function deviceMarker() {
+async function telegramDeviceMarker() {
   const manager = telegram?.BiometricManager;
   if (manager && telegram.isVersionAtLeast("7.2")) {
     try {
       if (!manager.isInited) await within((done) => manager.init(done), 2000);
       const id = manager.deviceId || "";
-      if (manager.isBiometricAvailable && /^[a-zA-Z0-9_:-]{12,200}$/.test(id)) {
+      if (/^[a-zA-Z0-9_:-]{12,200}$/.test(id) && !/^(.)\1*$/.test(id.replace(/[_:-]/g, ""))) {
         const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("wxs-device:" + id));
         return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, "0")).join("");
       }
@@ -190,7 +190,18 @@ async function deviceMarker() {
       // No biometric authentication or enrollment is needed for the local fallback.
     }
   }
-  return localDeviceMarker();
+  return null;
+}
+
+async function deviceMarker() {
+  const results = await Promise.allSettled([
+    telegramDeviceMarker(),
+    Promise.resolve().then(localDeviceMarker),
+  ]);
+  const markers = results.filter(result => result.status === "fulfilled" && result.value)
+    .map(result => result.value);
+  if (!markers.length) throw new Error("Device storage unavailable");
+  return [...new Set(markers)].join(":");
 }
 
 async function submit() {
