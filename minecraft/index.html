@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#152326">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Шахта · WXS Game</title>
+  <link rel="stylesheet" href="style.css?v=2">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script type="module" src="src/main.js?v=2"></script>
+</head>
+<body>
+  <main id="mine" hidden>
+    <canvas id="view" aria-label="Трёхмерный вид шахты"></canvas>
+    <div id="prices" aria-hidden="true"></div>
+    <div id="damage" aria-hidden="true"></div>
+    <header class="top">
+      <span id="demo-label" class="demo-label" hidden>ДЕМО</span>
+      <div class="readings"><div><small>ГЛУБИНА</small><b id="depth">00 м</b></div><div><small>БАЛАНС</small><b id="balance">$0.00</b></div></div>
+      <button id="help" class="icon-button" aria-label="Управление и шансы">?</button>
+    </header>
+    <div id="toast" role="status" hidden><i aria-hidden="true"></i><div><b></b><small></small></div></div>
+    <div class="aim" aria-hidden="true"></div>
+    <output id="target" hidden></output>
+    <div class="touch">
+      <div id="stick" aria-label="Движение"><span></span></div>
+      <button id="jump" type="button" aria-label="Прыжок">↑</button>
+      <button id="dig" type="button" aria-label="Добыть блок"><span class="hud-icon pick-icon" aria-hidden="true"></span></button>
+    </div>
+    <footer class="hud" aria-label="Состояние шахтёра">
+      <div class="hud-vitals">
+        <div class="hud-row armor" role="img" aria-label="Броня отсутствует">
+          <i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div id="hearts" class="hud-row health" role="img" aria-label="Полное здоровье">
+          <i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="hud-row food" role="img" aria-label="Сытость полная">
+          <i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <span id="level" aria-hidden="true" hidden></span>
+      </div>
+      <progress id="experience" max="10" value="0" aria-label="Опыт добычи"></progress>
+      <div class="hotbar" role="img" aria-label="Панель предметов, выбрана алмазная кирка">
+        <span class="slot equipped"><i class="hud-icon pick-icon"></i></span>
+        <span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span>
+        <span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span>
+      </div>
+    </footer>
+    <div id="death" hidden><div class="death-card"><small>АВАРИЯ В ШАХТЕ</small><h2>Взрыв ТНТ</h2><p>Возрождение на поверхности</p></div></div>
+  </main>
+  <section id="entry" class="overlay">
+    <div class="card"><div class="emblem" aria-hidden="true">◆</div><h1>Шахта</h1><p id="entry-status" role="status">Проверяем доступ…</p><a id="open-bot" href="https://t.me/wxsgame" hidden>Открыть @wxsgame</a></div>
+  </section>
+  <dialog id="guide">
+    <section class="card">
+      <small>WXS GAME</small><h2>Шахта</h2>
+      <p>Двигайся стиком и веди пальцем по экрану. На ПК используй WASD, пробел, мышь и левый клик. Для захвата мыши нажми на сцену.</p>
+      <p>Обычные блоки бесплатны. Цена руды списывается за удар, который добывает блок.</p>
+      <dl><div><dt>ТНТ</dt><dd>10%</dd></div><div><dt>0.70×</dt><dd>20%</dd></div><div><dt>1.00×</dt><dd>30%</dd></div><div><dt>1.40×</dt><dd>30%</dd></div><div><dt>1.15×</dt><dd>10%</dd></div><div><dt>RTP</dt><dd>97.5%</dd></div></dl>
+      <details><summary>Проверка последней добычи</summary><pre id="proof">Добытая руда появится здесь.</pre></details>
+      <details><summary>Авторы материалов</summary><p>Текстура камня из модели <a href="https://sketchfab.com/3d-models/minecraft-stone-block-3678d5fd71c2413d82b8891282945510">Minecraft-stone-block</a> от momo, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</p></details>
+      <form method="dialog"><button>В шахту</button></form>
+    </section>
+  </dialog>
+</body>
+</html>
