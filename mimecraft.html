@@ -133,16 +133,28 @@ function drawBadge(id){const c=badgeCv[id]||(badgeCv[id]=document.createElement(
  let t=badgeTex[id];if(!t){t=badgeTex[id]=new THREE.CanvasTexture(c);t.anisotropy=renderer.capabilities.getMaxAnisotropy();t.minFilter=THREE.LinearMipmapLinearFilter;t.magFilter=THREE.LinearFilter;t.generateMipmaps=true}
  t.needsUpdate=true}
 for(const id in ORES)drawBadge(id);onAtlas.push(()=>{for(const id in ORES)drawBadge(id)});
-const pool=[...Array(18)].map(()=>{const s=new THREE.Sprite(new THREE.SpriteMaterial({map:badgeTex[4],transparent:true,depthWrite:false}));
- s.scale.set(.72,.36,1);s.visible=false;s.renderOrder=3;scene.add(s);return s});
+const bGeo=new THREE.PlaneGeometry(.95,.475);
+const pool=[...Array(18)].map(()=>{const s=new THREE.Mesh(bGeo,new THREE.MeshBasicMaterial({map:badgeTex[4],transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+ s.visible=false;s.renderOrder=3;s.frustumCulled=false;scene.add(s);return s});
+const _bx=new THREE.Vector3(),_by=new THREE.Vector3(),_bz=new THREE.Vector3(),_bm=new THREE.Matrix4();
+// Бейджик — плоская «наклейка» на грани руды, которая смотрит на игрока (впечатана в блок, не парит)
 function updBadges(){const cx=p.x,cy=p.y+1.62,cz=p.z,L=[];
  for(const i of OREL){const id=B[i];if(!ORES[id])continue;const d=(i/400)|0,z=((i%400)/W)|0,x=i%W,c=-d-1,
-  dx=x+.5-cx,dy=c+.5-cy,dz=z+.5-cz,dist=dx*dx+dy*dy+dz*dz;if(dist>196)continue;
-  if(dx*fwd.x+dy*fwd.y+dz*fwd.z<0)continue;let best=null,bd=1e9;
+  dx=x+.5-cx,dy=c+.5-cy,dz=z+.5-cz;if(dx*dx+dy*dy+dz*dz>196)continue;
+  if(dx*fwd.x+dy*fwd.y+dz*fwd.z<-.8)continue;let best=null,bd=1e9;
   for(const [nr] of FACES){const ax=x+nr[0],ac=c+nr[1],az=z+nr[2];if(!air(ax,ac,az)||ac<-D)continue;
-   const q=(ax+.5-cx)**2+(ac+.5-cy)**2+(az+.5-cz)**2;if(q<bd){bd=q;best=nr}}
-  if(best)L.push([dist,id,x+.5+best[0]*.82,c+.5+best[1]*.82,z+.5+best[2]*.82])}
- L.sort((a,b)=>a[0]-b[0]);pool.forEach((s,k)=>{const o=L[k];s.visible=!!o;if(o){s.material.map=badgeTex[o[1]];s.position.set(o[2],o[3],o[4])}})}
+   const fx=x+.5+nr[0]*.5,fy=c+.5+nr[1]*.5,fz=z+.5+nr[2]*.5,vx=cx-fx,vy=cy-fy,vz=cz-fz;
+   if(vx*nr[0]+vy*nr[1]+vz*nr[2]<=0)continue; // только грань, видимая с места игрока
+   const q=vx*vx+vy*vy+vz*vz;if(q<bd){bd=q;best=[nr,fx,fy,fz]}}
+  if(best)L.push([bd,id,best])}
+ L.sort((a,b)=>a[0]-b[0]);
+ pool.forEach((s,k)=>{const o=L[k];s.visible=!!o;if(!o)return;const [nr,fx,fy,fz]=o[2];
+  _bz.set(nr[0],nr[1],nr[2]);
+  if(nr[1]){_by.set(fwd.x,0,fwd.z);if(_by.lengthSq()<1e-4)_by.set(0,0,-1);_by.normalize()}else _by.set(0,1,0);
+  _bx.crossVectors(_by,_bz).normalize();_by.crossVectors(_bz,_bx);
+  _bm.makeBasis(_bx,_by,_bz);s.quaternion.setFromRotationMatrix(_bm);
+  s.position.set(fx+nr[0]*.004-_by.x*.2,fy+nr[1]*.004-_by.y*.2,fz+nr[2]*.004-_by.z*.2);
+  if(s.material.map!==badgeTex[o[1]])s.material.map=badgeTex[o[1]]})}
 
 /* ===== 6. Рука + кирка (отдельная сцена, свой depth) ===== */
 const hs=new THREE.Scene(),hc=new THREE.PerspectiveCamera(70,1,.01,10),hand=new THREE.Group();hs.add(hand);
@@ -156,7 +168,9 @@ pg.setIndex(new THREE.BufferAttribute(new Uint16Array(u8('AAABAAIAAAACAAMABAAFAA
 const pkT=new THREE.Texture(pkI);pkT.flipY=false;pkT.magFilter=pkT.minFilter=THREE.NearestFilter;pkT.generateMipmaps=false;
 pkI.onload=()=>{pkT.needsUpdate=true;lastProg=-1};pkI.src='data:image/png;base64,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';
 const pick=new THREE.Mesh(pg,new THREE.MeshBasicMaterial({map:pkT,side:THREE.DoubleSide}));
-const PKS=.9/26,pickG=new THREE.Group();pick.scale.setScalar(PKS);pick.rotation.set(-.4,Math.PI-.45,-.26,'YXZ');pickG.add(pick);hand.add(pickG);
+const PKS=.9/26*.88,pickG=new THREE.Group();pick.scale.setScalar(PKS);pick.rotation.set(0,Math.PI-.5,.3,'YXZ');
+// точка хвата (низ рукояти) — в начале pickG: кирка стоит головой вверх и качается вокруг руки
+pick.position.set(-8*PKS,-8*PKS,0).applyEuler(pick.rotation).negate();pickG.add(pick);hand.add(pickG);
 
 
 /* ===== 7. Игрок, ввод ===== */
@@ -302,7 +316,7 @@ function frame(now){requestAnimationFrame(frame);let dt=Math.min((now-last)/1000
  const pg=Math.round(prog*40);if(pg!==lastProg){lastProg=pg;drawHud()}
  const act=digging&&tgt&&!dead&&!busy,sw=act?Math.abs(Math.sin(swing)):0,bob=Math.sin(walkT*2.4)*.012;
  armA+=((digging&&tgt&&!dead?1:0)-armA)*Math.min(1,dt*10);   // рука выезжает только при копании
- pickG.position.set(.28+Math.sin(walkT*1.2)*.01,-.32+bob-sw*.1,-.85-sw*.1);pickG.rotation.set(-sw*.8,0,sw*.15);
+ pickG.position.set(.5+Math.sin(walkT*1.2)*.01,-.72+bob-sw*.1,-.9-sw*.1);pickG.rotation.set(-sw*.8,0,sw*.15);
  arm.position.set(.62+(1-armA)*.4,-.8-(1-armA)*.55,-.65);arm.visible=armA>.02;
  renderer.clear();renderer.render(scene,cam);renderer.clearDepth();if(!dead)renderer.render(hs,hc)}
 API.init().then(upd).catch(e=>{if(e)pop('Ошибка загрузки: '+String(e.message).slice(0,40),'err',false,7000)});upd();spawn();fit();drawHud();requestAnimationFrame(frame);
