@@ -13,7 +13,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
 #cross:before,#cross:after{content:"";position:absolute;background:#fff}
 #cross:before{left:8px;top:0;width:2px;height:18px}#cross:after{top:8px;left:0;height:2px;width:18px}
 #hud{position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);image-rendering:pixelated;pointer-events:none}
-#bal{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:10px;color:#fff;font-weight:bold;font-size:18px;text-shadow:2px 2px #3f3f3f;pointer-events:none}
+#bal{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));left:10px;color:#fff;font-weight:bold;font-size:18px;text-shadow:2px 2px #3f3f3f;pointer-events:none}
 #bal small{color:#ff5;font-size:11px;margin-left:6px}
 #pop{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translate(-50%,-160%);transition:transform .28s cubic-bezier(.2,1.1,.4,1);
  min-width:210px;max-width:86vw;text-align:center;padding:10px 18px;border-radius:14px;color:#fff;background:rgba(20,20,24,.92);border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 24px rgba(0,0,0,.4);pointer-events:none;z-index:9}
@@ -65,7 +65,9 @@ const oreTex=(i,c1,c2)=>{seed=1000+i;ag.drawImage(A,48,0,16,16,i*16,0,16,16);for
  for(const [dx,dy] of [[0,0],[1,0],[0,1],[1,1]])if(rnd()<.75)px(i,cx+dx,cy+dy,rnd()<.35?c2:c1)}};
 ORE_DEF.forEach(d=>oreTex(...d));
 // Текстура камня: «Minecraft-stone-block» by momo (Sketchfab), CC-BY-4.0 — https://sketchfab.com/3d-models/minecraft-stone-block-3678d5fd71c2413d82b8891282945510
-const stoneImg=new Image();stoneImg.onload=()=>{ag.imageSmoothingEnabled=false;ag.drawImage(stoneImg,48,0,16,16);ORE_DEF.forEach(d=>oreTex(...d));atlas.needsUpdate=true};
+// Медная руда: «Minecraft Copper Ore» (copper_ore.glb, предоставлена автором проекта)
+const cuImg=new Image(),drawCu=()=>{if(cuImg.naturalWidth){ag.imageSmoothingEnabled=false;ag.drawImage(cuImg,80,0,16,16)}atlas.needsUpdate=true};cuImg.onload=drawCu;cuImg.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAACJUlEQVR42l2Sz08TURDHB/oMtPO2L82WrCxpFFIWDAGjNuFoPBAxMcQEEi/eSPwLvHLzyM2zf4AHL0Yv3jwgFxMwDZg2dRtBt92Qtbw4U1ibgoeBanyn7yTz633mO7S5uQmXz1prjBHBzESktQYARAQAZkZEZa0dBMwsQpJExHEslRIqyd4e7sBJZ56uEBMAaNQyU2v9DFuHv053/PtRFF0UIOKq8aMoanO7OT4CAJMt0qiDILDWvjF3Xde1YSiZipllSDtuN8dHlrLdJ9Q9zJ5+8PqDj0nvi5UQ0RhTr9fLU/311vdSf9TNT2wtLOaTRPLacXuwpO/7FxM8zzsHb2fWHLguACRJEkURERFTeaoPAI2QtNbWWiUctNaDTgIEET9ydG0x2C172Ub8tLX9ijQiDvu+HwQBETXHR8pTfWIiIgAwxqxNV77t1bONeOaoVnJGH581mVlZa+tjQyePbo4B1BrxDNTOwTPGyO3WpiuvD/aW55a3AJIkQWszlUplNlf8VP1c7GeWncmzs0Kapvtf9nu/e4VCIU3TW8VSLpcLwzBNU2ZWiGitXb065zpuGIZxHAPAevboJQPE4HmeWEHQ/700MwuWar63lO2WaPTFRH73x9d3rIlIfCUwMysrK47jvOeDG7mf8wv3rmf02+NjRnjeHS7feaiUUkp1Op1qvnf+4LZTi4c2NjaMMe4lfjHsv6EQG3hZiRImYtiBI/6zvaD7A5QUSiyn7xwiAAAAAElFTkSuQmCC';
+const stoneImg=new Image();stoneImg.onload=()=>{ag.imageSmoothingEnabled=false;ag.drawImage(stoneImg,48,0,16,16);ORE_DEF.forEach(d=>d[0]!==5&&oreTex(...d));drawCu()};
 stoneImg.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAAAAAA6mKC9AAAAkUlEQVR42iXOoZEEMQwAwf4qMxmIGTiAS/CT3QAElhms8B1YOjWg//7xfBw0YQQ9i5B5umNIyel2z4g0FLCV1jHuRQcE6RpLllT33Bxr6KbEE6fZZ9iuT4WVEjkcszT3RBjpzG9vJ0iuUeJLiXspzxqRr6Rnvgcn3CvP29dwTc/s3hXkMaxEqc1Fv7DYLqdnix+uu0X3YqPsZgAAAABJRU5ErkJggg==';
 const atlas=new THREE.CanvasTexture(A);atlas.magFilter=atlas.minFilter=THREE.NearestFilter;atlas.generateMipmaps=false;
 
@@ -131,8 +133,8 @@ pg.setIndex(new THREE.BufferAttribute(new Uint16Array(u8('AAABAAIAAAACAAMABAAFAA
 const pkT=new THREE.Texture(pkI);pkT.flipY=false;pkT.magFilter=pkT.minFilter=THREE.NearestFilter;pkT.generateMipmaps=false;
 pkI.onload=()=>{pkT.needsUpdate=true;lastProg=-1};pkI.src='data:image/png;base64,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';
 const pick=new THREE.Mesh(pg,new THREE.MeshBasicMaterial({map:pkT,side:THREE.DoubleSide}));
-const PKS=.95/26;pick.scale.set(-PKS,PKS,PKS);pick.position.set(.02,.32,-.18);pick.rotation.set(0,0,.1);hand.add(pick);
-hand.position.set(.5,-.55,-.8);hand.rotation.set(.1,.3,0);
+const PKS=.5/26;pick.scale.set(-PKS,PKS,PKS);pick.position.set(.2,.2,-.25);pick.rotation.set(0,0,.1-Math.PI/2);hand.add(pick);
+hand.position.set(.36,-.55,-.8);hand.rotation.set(.1,.3,0);
 
 /* ===== 7. Игрок, ввод ===== */
 const p={x:10.5,y:0,z:10.5,vx:0,vy:0,vz:0,ground:false,yaw:0,pitch:0},fwd=new THREE.Vector3();
@@ -194,7 +196,7 @@ function drawHud(){hg.clearRect(0,0,182,49);
 let lastProg=-1;
 function fit(){const w=innerWidth,h=innerHeight,s=Math.max(1,Math.min(4,Math.floor(w/190)));hud.style.width=182*s+'px';hud.style.height=49*s+'px';
  renderer.setPixelRatio(PR);renderer.setSize(w,h,false);const a=w/h;
- cam.fov=a>=1?90:2*Math.atan(1/a)*180/Math.PI;cam.aspect=a;cam.updateProjectionMatrix();hc.aspect=a;hc.updateProjectionMatrix()}
+ cam.fov=a>=1?90:2*Math.atan(1/a)*180/Math.PI;cam.aspect=a;cam.updateProjectionMatrix();hc.aspect=a;hc.fov=a>=1?70:2*Math.atan(Math.tan(35*Math.PI/180)/a)*180/Math.PI;hc.updateProjectionMatrix()}
 let PR=Math.min(devicePixelRatio||1,1.5);onresize=fit;
 
 /* ===== 9. Эффекты: частицы, монетки, TNT, поп-апы ===== */
@@ -262,7 +264,7 @@ function frame(now){requestAnimationFrame(frame);let dt=Math.min((now-last)/1000
  stepParts(dt);badgeT-=dt;if(badgeT<=0){updBadges();badgeT=.25}
  const pg=Math.round(prog*40);if(pg!==lastProg){lastProg=pg;drawHud()}
  const sw=digging&&tgt?Math.abs(Math.sin(swing)):0,bob=Math.sin(walkT*2.4)*.012;
- hand.position.set(.5+Math.sin(walkT*1.2)*.01,-.55+bob-sw*.1,-.8-sw*.12);hand.rotation.set(.1-sw*.95,.3-sw*.25,sw*.2);
+ hand.position.set(.36+Math.sin(walkT*1.2)*.01,-.55+bob-sw*.1,-.8-sw*.12);hand.rotation.set(.1-sw*.95,.3-sw*.25,sw*.2);
  renderer.clear();renderer.render(scene,cam);renderer.clearDepth();if(!dead)renderer.render(hs,hc)}
 API.init().then(upd).catch(e=>{if(e)pop('Ошибка загрузки',String(e.message).includes('FORBIDDEN')?'Нет доступа':'Нет связи с сервером','err')});upd();spawn();fit();drawHud();requestAnimationFrame(frame);
 </script></body></html>
