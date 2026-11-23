@@ -38,25 +38,18 @@ const W=20,D=50,GRASS=1,DIRT=2,STONE=3,BED=11,TNT_T=12;
 // id: [название, цена $, цвет частиц]
 const ORES={4:['coal',.10,'#2b2b2b'],5:['copper',.15,'#e0805a'],6:['iron',.25,'#d8af93'],7:['gold',.5,'#fcee4b'],8:['lapis',.65,'#2a4fb5'],9:['redstone',.75,'#e02020'],10:['diamond',1,'#5decf5']};
 const ORE_ID=Object.fromEntries(Object.entries(ORES).map(([k,v])=>[v[0],+k]));
-// Таблица исходов (вес из 10000). Множитель 0 = ДИНАМИТ. Σвес=10000, Σ(мульт×вес)=9750 → RTP ровно 97.50%, шанс TNT 8%.
-const OUT=[[0,800],[.3,1900],[.5,1500],[.7,1700],[1,1500],[1.2,50],[1.4,1200],[2,800],[3,350],[5,130],[10,70]];
+// Таблица исходов и розыгрыш — только на сервере (mimecraft.sql): RTP 97.50%, динамит 8%.
 
 /* ===== 2. Telegram / сервер ===== */
 const tg=window.Telegram?.WebApp;tg?.ready?.();tg?.expand?.();tg?.disableVerticalSwipes?.();
 const sb=window.supabase?.createClient(window.WXS_CONFIG?.supabaseUrl||'https://nkovsjhwinbbapsqvpnu.supabase.co',window.WXS_CONFIG?.supabaseKey||'sb_publishable_GVUZWdR9qVSHwL7aL63W8w_g7rtfJkN');
-const API={bal:5,demo:true,
- async init(){ if(!sb||!tg?.initData)return;
-  try{const {data,error}=await sb.rpc('release_ensure_player',{p_init:tg.initData});if(!error&&data&&data.balance!=null){this.bal=+data.balance;this.demo=false}}catch(e){} },
- // Боевой режим: ВСЯ случайность на сервере (RPC mc_dig(p_init,p_ore) → {tnt,mult,win,balance}). Если RPC ещё нет — DEMO.
- async dig(ore){
-  if(!this.demo&&sb){const {data,error}=await sb.rpc('mc_dig',{p_init:tg.initData,p_ore:ore});
-   if(!error&&data){this.bal=+data.balance;return data}
-   if(!/PGRST202|not find|does not exist/i.test(error?.message||error?.code||'x'))throw new Error(error?.message||'server');
-   this.demo=true;upd()}
-  const price=ORES[ORE_ID[ore]][1],u=new Uint32Array(1);crypto.getRandomValues(u);let r=u[0]%10000,m=0;
-  for(const [x,w] of OUT){if(r<w){m=x;break}r-=w}
-  this.bal-=price;if(m===0)return{tnt:true,mult:0,win:0,balance:this.bal};
-  const win=+(price*m).toFixed(4);this.bal+=win;return{tnt:false,mult:m,win,balance:this.bal}}};
+const API={bal:0,
+ async init(){ // баланс только с сервера; без подписанного initData игра не запускается
+  if(!sb||!tg?.initData){document.body.innerHTML='<div style="color:#fff;background:#222;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font:16px monospace">Откройте игру через бота командой /mimecraft</div>';throw 0}
+  const {data,error}=await sb.rpc('mc_state',{p_init:tg.initData});if(error)throw new Error(error.message);this.bal=+data.balance},
+ // ВСЁ решает сервер (mc_dig): подпись, цена, розыгрыш, баланс. Клиент ничего не считает.
+ async dig(ore){const {data,error}=await sb.rpc('mc_dig',{p_init:tg.initData,p_ore:ore});
+  if(error||!data)throw new Error(error?.message||'server');this.bal=+data.balance;return data}};
 
 /* ===== 3. Процедурные текстуры 16×16 (атлас 256×16) ===== */
 let seed=1337;const rnd=()=>(seed=(seed*1664525+1013904223)>>>0)/4294967296;
@@ -231,14 +224,19 @@ function explodeAt(t){busy=true;dead=false;const m=new THREE.Mesh(new THREE.BoxG
 function respawn(){if(document.getElementById('dead').style.display!=='flex')return;document.getElementById('dead').style.display='none';spawn();dead=false;busy=false;prog=0}
 document.getElementById('resp').onclick=respawn;
 const vib=k=>{try{tg?.HapticFeedback?.impactOccurred(k==='heavy'?'heavy':'light')}catch(e){}};
-const upd=()=>{document.getElementById('balv').textContent='$'+API.bal.toFixed(2);document.getElementById('demo').textContent=API.demo?'DEMO':''};
+const upd=()=>{document.getElementById('balv').textContent='$'+API.bal.toFixed(2);};
 
 /* ===== 10. Копание ===== */
 const colorOf=id=>ORES[id]?ORES[id][2]:id===GRASS?'#5f9f45':id===DIRT?'#866043':id===STONE?'#7d7d7d':'#464646';
 async function breakBlock(t){const ore=ORES[t.id];
  if(!ore){dropBlock(t.x,t.c,t.z);rebuild();burst(t.x,t.c,t.z,colorOf(t.id),10);vib('light');prog=0;return}
  if(API.bal+1e-9<ore[1]){pop('Недостаточно средств',`Нужно $${ore[1].toFixed(2)} · баланс $${API.bal.toFixed(2)}`,'err');cool=.8;prog=0;shake=.15;vib('light');return}
- busy=true;let r;try{r=await API.dig(ore[0])}catch(e){busy=false;prog=0;cool=.8;pop('Ошибка сервера','Попробуйте ещё раз','err');return}
+ busy=true;let r;try{r=await API.dig(ore[0])}catch(e){busy=false;prog=0;cool=.8;const m=String(e.message);
+  if(/NO_FUNDS/.test(m)){API.init().then(upd).catch(()=>{});pop('Недостаточно средств','Пополните баланс','err')}
+  else if(/RATE/.test(m))pop('Слишком быстро','Подождите мгновение','err')
+  else if(/FORBIDDEN/.test(m))pop('Нет доступа','Игра пока закрыта','err')
+  else if(/EXPIRED|BAD_|SIGNATURE/.test(m))pop('Сессия устарела','Откройте игру заново через бота','err')
+  else pop('Ошибка сервера','Попробуйте ещё раз','err');return}
  upd();dropBlock(t.x,t.c,t.z);prog=0;
  if(r.tnt){rebuild();explodeAt(t);return}
  rebuild();burst(t.x,t.c,t.z,colorOf(t.id),12);vib('light');
@@ -262,5 +260,5 @@ function frame(now){requestAnimationFrame(frame);let dt=Math.min((now-last)/1000
  const sw=digging&&tgt?Math.abs(Math.sin(swing)):0,bob=Math.sin(walkT*2.4)*.012;
  hand.position.set(.5+Math.sin(walkT*1.2)*.01,-.55+bob-sw*.1,-.8-sw*.12);hand.rotation.set(.1-sw*.95,.3-sw*.25,sw*.2);
  renderer.clear();renderer.render(scene,cam);renderer.clearDepth();if(!dead)renderer.render(hs,hc)}
-API.init().then(()=>{upd()});upd();spawn();fit();drawHud();requestAnimationFrame(frame);
+API.init().then(upd).catch(e=>{if(e)pop('Ошибка загрузки',String(e.message).includes('FORBIDDEN')?'Нет доступа':'Нет связи с сервером','err')});upd();spawn();fit();drawHud();requestAnimationFrame(frame);
 </script></body></html>
